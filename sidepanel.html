@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>OWPD – Olpo's WordPressDock</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="sp-body">
+  <header class="sp-header">
+    <h1 class="sp-header__brand">
+      OWPD <span class="sp-header__tag">WordPressDock</span>
+    </h1>
+    <div class="sp-header__actions">
+      <button id="sp-theme-toggle" class="owpd-btn owpd-btn--sm" title="Theme wechseln">◐</button>
+      <button id="sp-refresh-all" class="owpd-btn owpd-btn--sm" title="Alle prüfen">↻</button>
+      <button id="sp-open-dashboard" class="owpd-btn owpd-btn--primary owpd-btn--sm">Dashboard ↗</button>
+    </div>
+  </header>
+
+  <div class="sp-toolbar">
+    <input type="search" id="sp-search" class="owpd-input" placeholder="Installation suchen...">
+  </div>
+
+  <div id="sp-active-tab-box"></div>
+
+  <main id="sp-sites-list" class="sp-list"></main>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>
