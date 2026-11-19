@@ -1,14 +1,45 @@
 <?php
 /**
  * Plugin Name: OWPD Companion (Olpo's WordPressDock)
- * Description: Schlanker REST-Endpunkt für Status-Checks (WP, PHP, Updates) und 30s One-Click-Login.
- * Version: 1.0.0
+ * Description: Lightweight REST endpoint for status checks (WP, PHP, updates) and 30s one-click login.
+ * Version: 1.1.0
  * Author: Ole Poetter (olpo24)
+ * Text Domain: owpd-companion
+ * Domain Path: /languages
  */
 
 if (!defined('ABSPATH')) {
     exit;
 }
+
+/**
+ * Load standard translations if .mo files exist, plus built-in German fallback
+ * so single-file / mu-plugin deployments work out of the box without extra files.
+ */
+add_action('init', function () {
+    load_plugin_textdomain('owpd-companion', false, dirname(plugin_basename(__FILE__)) . '/languages');
+});
+
+add_filter('gettext', function ($translated, $text, $domain) {
+    if ($domain !== 'owpd-companion') {
+        return $translated;
+    }
+
+    $locale = function_exists('determine_locale') ? determine_locale() : get_locale();
+    if (strpos((string) $locale, 'de') !== 0) {
+        return $translated;
+    }
+
+    $de_map = [
+        'No valid user.'                           => 'Kein gültiger Benutzer.',
+        'Invalid login token.'                     => 'Ungültiges Login-Token.',
+        'Login token expired or already used.'     => 'Login-Token abgelaufen oder bereits verwendet.',
+        'Permission denied.'                       => 'Berechtigung verweigert.',
+        'Lightweight REST endpoint for status checks (WP, PHP, updates) and 30s one-click login.' => 'Schlanker REST-Endpunkt für Status-Checks (WP, PHP, Updates) und 30s One-Click-Login.',
+    ];
+
+    return $de_map[$text] ?? $translated;
+}, 10, 3);
 
 add_action('rest_api_init', function () {
     register_rest_route('owpd/v1', '/status', [
@@ -84,7 +115,7 @@ function owpd_get_site_status() {
 function owpd_create_login_token() {
     $user_id = get_current_user_id();
     if (!$user_id) {
-        return new WP_Error('no_user', 'Kein gültiger Benutzer.', ['status' => 403]);
+        return new WP_Error('no_user', __('No valid user.', 'owpd-companion'), ['status' => 403]);
     }
 
     $token = bin2hex(random_bytes(24));
@@ -107,7 +138,7 @@ add_action('login_init', function () {
 
     $token = sanitize_text_field(wp_unslash($_GET['owpd_autologin']));
     if (!preg_match('/^[a-f0-9]{48}$/', $token)) {
-        wp_die('Ungültiges Login-Token.', "Olpo's WordPressDock", ['response' => 403]);
+        wp_die(esc_html__('Invalid login token.', 'owpd-companion'), "Olpo's WordPressDock", ['response' => 403]);
     }
 
     $transient_key = 'owpd_login_' . $token;
@@ -116,12 +147,12 @@ add_action('login_init', function () {
     delete_transient($transient_key);
 
     if (!$user_id) {
-        wp_die('Login-Token abgelaufen oder bereits verwendet.', "Olpo's WordPressDock", ['response' => 403]);
+        wp_die(esc_html__('Login token expired or already used.', 'owpd-companion'), "Olpo's WordPressDock", ['response' => 403]);
     }
 
     $user = get_user_by('id', (int) $user_id);
     if (!$user || !user_can($user, 'manage_options')) {
-        wp_die('Berechtigung verweigert.', "Olpo's WordPressDock", ['response' => 403]);
+        wp_die(esc_html__('Permission denied.', 'owpd-companion'), "Olpo's WordPressDock", ['response' => 403]);
     }
 
     wp_clear_auth_cookie();
