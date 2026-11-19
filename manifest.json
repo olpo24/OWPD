@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Olpo's WordPressDock",
+  "name": "__MSG_extName__",
   "short_name": "OWPD",
-  "version": "1.0.0",
-  "description": "Schnellansicht im Side Panel & Vollbild-Dashboard für deine WordPress-Installationen.",
+  "version": "1.1.0",
+  "default_locale": "en",
+  "description": "__MSG_extDescription__",
   "permissions": [
     "storage",
     "sidePanel",
@@ -15,7 +16,7 @@
     "http://*/*"
   ],
   "action": {
-    "default_title": "Olpo's WordPressDock öffnen"
+    "default_title": "__MSG_actionTitle__"
   },
   "side_panel": {
     "default_path": "sidepanel.html"
