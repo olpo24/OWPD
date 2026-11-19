@@ -35,10 +35,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   checkAllBtn.addEventListener('click', async () => {
     checkAllBtn.disabled = true;
-    checkAllBtn.textContent = 'Prüfe alle...';
+    checkAllBtn.textContent = t('checkingAll');
     await chrome.runtime.sendMessage({ type: 'CHECK_ALL_SITES' });
     checkAllBtn.disabled = false;
-    checkAllBtn.textContent = '↻ Alle jetzt prüfen';
+    checkAllBtn.textContent = t('checkAllNow');
   });
 
   addBtn.addEventListener('click', () => openSiteModal(null));
@@ -79,10 +79,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const id = document.getElementById('field-id').value;
     if (!id) return;
     modalCheckBtn.disabled = true;
-    modalCheckBtn.textContent = 'Prüfe...';
+    modalCheckBtn.textContent = t('testingStatus');
     const res = await chrome.runtime.sendMessage({ type: 'CHECK_SINGLE_SITE', siteId: id });
     modalCheckBtn.disabled = false;
-    modalCheckBtn.textContent = 'Status jetzt testen';
+    modalCheckBtn.textContent = t('testStatusNow');
     if (res && res.site) {
       openSiteModal(res.site);
     }
@@ -90,7 +90,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   deleteBtn.addEventListener('click', async () => {
     const id = document.getElementById('field-id').value;
-    if (!id || !confirm('Diese WordPress-Installation wirklich entfernen?')) return;
+    if (!id || !confirm(t('confirmDelete'))) return;
     const { sites = [] } = await chrome.storage.local.get('sites');
     await chrome.storage.local.set({ sites: sites.filter((s) => s.id !== id) });
     closeSiteModal();
@@ -128,11 +128,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const text = await file.text();
       const imported = JSON.parse(text);
-      if (!Array.isArray(imported)) throw new Error('Ungültiges Format');
+      if (!Array.isArray(imported)) throw new Error(t('invalidFormat'));
       await chrome.storage.local.set({ sites: imported });
-      alert(`${imported.length} Installationen importiert.`);
+      alert(t('importSuccess', [String(imported.length)]));
     } catch (err) {
-      alert(`Import fehlgeschlagen: ${err.message}`);
+      alert(t('importFailed', [err.message]));
     }
     e.target.value = '';
   });
@@ -172,15 +172,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     statsEl.innerHTML = `
       <div class="db-stat-card">
-        <div class="db-stat-card__label">Installationen gesamt</div>
+        <div class="db-stat-card__label">${escapeHtml(t('statTotal'))}</div>
         <div class="db-stat-card__value">${sites.length}</div>
       </div>
       <div class="db-stat-card">
-        <div class="db-stat-card__label">Online erreichbar</div>
+        <div class="db-stat-card__label">${escapeHtml(t('statOnline'))}</div>
         <div class="db-stat-card__value" style="color: var(--success);">${onlineCount}</div>
       </div>
       <div class="db-stat-card">
-        <div class="db-stat-card__label">Ausstehende Updates</div>
+        <div class="db-stat-card__label">${escapeHtml(t('statUpdates'))}</div>
         <div class="db-stat-card__value" style="color: ${totalUpdates > 0 ? 'var(--warning)' : 'inherit'};">${totalUpdates}</div>
       </div>
     `;
@@ -200,7 +200,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     if (filtered.length === 0) {
-      gridEl.innerHTML = `<div class="owpd-empty" style="grid-column: 1 / -1;">Keine passenden Installationen gefunden.</div>`;
+      gridEl.innerHTML = `<div class="owpd-empty" style="grid-column: 1 / -1;">${escapeHtml(t('noMatchingSites'))}</div>`;
       return;
     }
 
@@ -208,6 +208,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       .map((site) => {
         const cleanUrl = site.url.replace(/\/$/, '');
         const updates = (site.pluginsCount || 0) + (site.themesCount || 0) + (site.coreUpdate ? 1 : 0);
+        const statusLabel =
+          site.status === 'online'
+            ? t('statusOnline')
+            : site.status === 'auth_error'
+            ? t('statusAuthError')
+            : site.status === 'offline'
+            ? t('statusOffline')
+            : t('statusUnchecked');
+
+        const updateBadgeText =
+          updates === 1 ? t('updateSingle') : t('updatePlural', [String(updates)]);
 
         return `
           <article class="db-card">
@@ -219,7 +230,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                   <a href="${cleanUrl}" target="_blank" rel="noopener" class="sp-card__url">${escapeHtml(cleanUrl)}</a>
                 </div>
                 <span class="owpd-badge owpd-badge--${site.status || 'neutral'}">
-                  <span class="owpd-dot"></span>${site.status || 'ungeprüft'}
+                  <span class="owpd-dot"></span>${escapeHtml(statusLabel)}
                 </span>
               </div>
 
@@ -229,8 +240,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 ${site.bricksVersion ? `<span class="owpd-badge owpd-badge--neutral">Bricks ${escapeHtml(site.bricksVersion)}</span>` : ''}
                 ${
                   updates > 0
-                    ? `<span class="owpd-badge owpd-badge--updates">${updates} Update${updates > 1 ? 's' : ''}</span>`
-                    : `<span class="owpd-badge owpd-badge--neutral">Aktuell</span>`
+                    ? `<span class="owpd-badge owpd-badge--updates">${escapeHtml(updateBadgeText)}</span>`
+                    : `<span class="owpd-badge owpd-badge--neutral">${escapeHtml(t('upToDate'))}</span>`
                 }
               </div>
 
@@ -244,13 +255,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="db-card__footer">
               ${
                 site.username && site.appPassword
-                  ? `<button class="owpd-btn owpd-btn--success owpd-btn--sm" data-action="autologin" data-id="${site.id}">1-Click Login</button>`
+                  ? `<button class="owpd-btn owpd-btn--success owpd-btn--sm" data-action="autologin" data-id="${site.id}">${escapeHtml(t('oneClickLogin'))}</button>`
                   : `<a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/wp-admin/" target="_blank">WP-Admin</a>`
               }
-              <a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/wp-admin/plugins.php" target="_blank">Plugins</a>
-              <a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/wp-admin/update-core.php" target="_blank">Updates</a>
+              <a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/wp-admin/plugins.php" target="_blank">${escapeHtml(t('plugins'))}</a>
+              <a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/wp-admin/update-core.php" target="_blank">${escapeHtml(t('updates'))}</a>
               <button class="owpd-btn owpd-btn--primary owpd-btn--sm" style="margin-left: auto;" data-action="details" data-id="${site.id}">
-                Details & Updates
+                ${escapeHtml(t('detailsAndUpdates'))}
               </button>
             </div>
           </article>
@@ -261,7 +272,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function openSiteModal(site) {
     const liveDetailsEl = document.getElementById('modal-live-details');
-    document.getElementById('modal-title').textContent = site ? site.name : 'Neue WordPress-Installation';
+    document.getElementById('modal-title').textContent = site ? site.name : t('modalNewSite');
     document.getElementById('field-id').value = site ? site.id : '';
     document.getElementById('field-name').value = site ? site.name : '';
     document.getElementById('field-category').value = site ? site.category || '' : '';
@@ -274,11 +285,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     modalCheckBtn.style.display = site ? 'inline-flex' : 'none';
 
     if (site && site.companionActive) {
+      const uiLang = chrome.i18n.getUILanguage() || 'en';
+      const dateLocale = uiLang.startsWith('de') ? 'de-DE' : 'en-US';
+      const formattedDate = site.lastChecked ? new Date(site.lastChecked).toLocaleString(dateLocale) : '–';
+
       const pluginItems = (site.pluginsUpdates || [])
         .map((p) => `<li><span>Plugin: <strong>${escapeHtml(p.name)}</strong></span><span>${escapeHtml(p.version)} → <strong>${escapeHtml(p.new_version)}</strong></span></li>`)
         .join('');
       const themeItems = (site.themesUpdates || [])
-        .map((t) => `<li><span>Theme: <strong>${escapeHtml(t.name)}</strong></span><span>${escapeHtml(t.version)} → <strong>${escapeHtml(t.new_version)}</strong></span></li>`)
+        .map((tItem) => `<li><span>Theme: <strong>${escapeHtml(tItem.name)}</strong></span><span>${escapeHtml(tItem.version)} → <strong>${escapeHtml(tItem.new_version)}</strong></span></li>`)
         .join('');
       const coreItem = site.coreUpdate
         ? `<li><span><strong>WordPress Core</strong></span><span>${escapeHtml(site.wpVersion)} → <strong>${escapeHtml(site.newWpVersion)}</strong></span></li>`
@@ -289,22 +304,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       liveDetailsEl.innerHTML = `
         <div style="padding: 1.4rem; background: var(--bg-surface-alt); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
-            <strong>Ausstehende Updates</strong>
+            <strong>${escapeHtml(t('pendingUpdatesTitle'))}</strong>
             <span style="font-size: 1.2rem; color: var(--text-muted);">
-              Letzter Check: ${site.lastChecked ? new Date(site.lastChecked).toLocaleString('de-DE') : '–'}
+              ${escapeHtml(t('lastCheck', [formattedDate]))}
             </span>
           </div>
           ${
             allItems
               ? `<ul class="owpd-update-list">${allItems}</ul>`
-              : `<div style="color: var(--success); font-size: 1.3rem;">✓ Alle Plugins, Themes und Core sind auf dem neuesten Stand.</div>`
+              : `<div style="color: var(--success); font-size: 1.3rem;">${escapeHtml(t('allUpToDateMsg'))}</div>`
           }
         </div>
       `;
     } else if (site) {
       liveDetailsEl.innerHTML = `
         <div style="padding: 1.2rem; background: var(--bg-surface-alt); border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 1.3rem; color: var(--text-muted);">
-          Hinweis: Hinterlege <strong>Benutzername + Application Password</strong> (und <code>owpd-companion.php</code> auf der WP-Seite), um hier alle Plugin-/Core-Updates und den 1-Click-Login freizuschalten.
+          ${escapeHtml(t('companionHint'))}
         </div>
       `;
     } else {
@@ -329,7 +344,7 @@ async function triggerOneClickLogin(siteId, btnEl) {
 
   const originalText = btnEl.textContent;
   btnEl.disabled = true;
-  btnEl.textContent = 'Token...';
+  btnEl.textContent = t('tokenLoading');
 
   try {
     const cleanUrl = site.url.replace(/\/$/, '');
@@ -348,7 +363,7 @@ async function triggerOneClickLogin(siteId, btnEl) {
       await chrome.tabs.create({ url: data.login_url });
     }
   } catch (err) {
-    alert(`1-Click-Login fehlgeschlagen (${err.message}).`);
+    alert(t('loginFailed', [err.message]));
   } finally {
     btnEl.disabled = false;
     btnEl.textContent = originalText;
