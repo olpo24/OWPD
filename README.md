@@ -40,3 +40,29 @@ owpd/
 ├── dashboard.html
 ├── dashboard.js
 └── owpd-companion.php
+```
+
+---
+
+## Installation
+
+### 1. Chrome Extension
+1. Clone or download this repository.
+2. Open `chrome://extensions/` in Chrome (or any Chromium-based browser).
+3. Enable **Developer mode** in the top-right corner.
+4. Click **Load unpacked** and select the `owpd/` directory.
+5. Pin **Olpo's WordPressDock** to your toolbar.
+
+### 2. WordPress Companion Plugin (Optional, for Updates & 1-Click Login)
+Without the companion plugin, OWPD monitors availability via `/wp-json/` and provides quick admin links. To unlock live update counts and 1-Click Login:
+
+1. Upload `owpd-companion.php` to `wp-content/mu-plugins/` (or `wp-content/plugins/` and activate it).
+2. In your WordPress admin area, go to **Users → Profile → Application Passwords** and generate a new application password.
+3. Open the **OWPD Dashboard**, edit your site entry, and enter your **WP Username** and **Application Password**.
+
+---
+
+## Security Notes
+
+- All credentials (`username` and `Application Password`) are stored locally in `chrome.storage.local` and transmitted exclusively via HTTP Basic Auth over HTTPS.
+- One-click login tokens (`owpd_autologin`) are cryptographically random 48-char hex strings stored as WordPress transients with a **30-second TTL** and deleted immediately upon first use.
