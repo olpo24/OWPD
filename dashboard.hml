@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>OWPD – Olpo's WordPressDock Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="db-layout">
+    <aside class="db-sidebar">
+      <div class="db-brand">
+        <div>
+          <div class="db-brand__title">OWPD</div>
+          <div class="db-brand__sub">Olpo's WordPressDock</div>
+        </div>
+        <button id="db-theme-toggle" class="owpd-btn owpd-btn--sm" title="Theme wechseln">◐</button>
+      </div>
+
+      <nav class="db-nav" id="db-category-nav">
+        <button class="db-nav__item db-nav__item--active" data-filter="all">Alle Installationen</button>
+        <button class="db-nav__item" data-filter="updates">Mit Updates</button>
+        <button class="db-nav__item" data-filter="offline">Offline / Fehler</button>
+      </nav>
+
+      <div style="margin-top: auto; display: flex; flex-direction: column; gap: 0.8rem;">
+        <button id="db-export-btn" class="owpd-btn">JSON Exportieren</button>
+        <label class="owpd-btn" style="cursor: pointer;">
+          JSON Importieren
+          <input type="file" id="db-import-input" accept=".json" hidden>
+        </label>
+      </div>
+    </aside>
+
+    <main class="db-main">
+      <div class="db-topbar">
+        <div style="flex: 1; max-width: 42rem;">
+          <input type="search" id="db-search" class="owpd-input" placeholder="Nach Name, URL, Kategorie oder Notiz suchen...">
+        </div>
+        <div style="display: flex; gap: 1rem;">
+          <button id="db-check-all" class="owpd-btn">↻ Alle jetzt prüfen</button>
+          <button id="db-add-btn" class="owpd-btn owpd-btn--primary">+ Neue WordPress-Seite</button>
+        </div>
+      </div>
+
+      <section class="db-stats" id="db-stats"></section>
+      <section class="db-grid" id="db-grid"></section>
+    </main>
+  </div>
+
+  <!-- MODAL: DETAILANSICHT & BEARBEITEN -->
+  <div id="db-modal-backdrop" class="owpd-modal-backdrop">
+    <div class="owpd-modal">
+      <div class="owpd-modal__header">
+        <h2 id="modal-title" style="margin: 0; font-size: 2rem;">Installation</h2>
+        <button id="modal-close" class="owpd-btn owpd-btn--sm">✕ Schließen</button>
+      </div>
+
+      <div id="modal-live-details" style="margin-bottom: 2rem;"></div>
+
+      <form id="site-form" class="owpd-form-grid">
+        <input type="hidden" id="field-id">
+
+        <div class="owpd-form-group">
+          <label for="field-name">Projekt- / Seitenname *</label>
+          <input type="text" id="field-name" class="owpd-input" placeholder="z. B. bricks-index.de" required>
+        </div>
+
+        <div class="owpd-form-group">
+          <label for="field-category">Kategorie / Tag</label>
+          <input type="text" id="field-category" class="owpd-input" placeholder="z. B. Eigenes Projekt, Kunde, Staging">
+        </div>
+
+        <div class="owpd-form-group owpd-form-group--full">
+          <label for="field-url">WordPress-URL *</label>
+          <input type="url" id="field-url" class="owpd-input" placeholder="https://example.de" required>
+        </div>
+
+        <div class="owpd-form-group">
+          <label for="field-username">WP-Benutzername (für OWPD Companion)</label>
+          <input type="text" id="field-username" class="owpd-input" placeholder="admin">
+        </div>
+
+        <div class="owpd-form-group">
+          <label for="field-app-password">WordPress Application Password</label>
+          <input type="password" id="field-app-password" class="owpd-input" placeholder="xxxx xxxx xxxx xxxx xxxx xxxx">
+        </div>
+
+        <div class="owpd-form-group owpd-form-group--full">
+          <label for="field-notes">Notizen (Hoster, Besonderheiten, Aufgaben)</label>
+          <textarea id="field-notes" class="owpd-textarea" rows="3" placeholder="z. B. Netcup Webhosting 8000, Bricks Builder + MetaBox"></textarea>
+        </div>
+
+        <div class="owpd-form-group--full" style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
+          <button type="button" id="modal-delete-btn" class="owpd-btn owpd-btn--danger">Installation löschen</button>
+          <div style="display: flex; gap: 1rem;">
+            <button type="button" id="modal-check-btn" class="owpd-btn">Status jetzt testen</button>
+            <button type="submit" class="owpd-btn owpd-btn--primary">Speichern</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>
