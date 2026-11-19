@@ -85,8 +85,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (filtered.length === 0) {
       listEl.innerHTML = `
         <div class="owpd-empty">
-          <p>Noch keine WordPress-Seiten im Dock.</p>
-          <button id="sp-empty-add" class="owpd-btn owpd-btn--primary">Im Dashboard anlegen</button>
+          <p>${escapeHtml(t('emptyDock'))}</p>
+          <button id="sp-empty-add" class="owpd-btn owpd-btn--primary">${escapeHtml(t('createInDashboard'))}</button>
         </div>
       `;
       document.getElementById('sp-empty-add')?.addEventListener('click', () => {
@@ -102,12 +102,15 @@ document.addEventListener('DOMContentLoaded', async () => {
           (site.pluginsCount || 0) + (site.themesCount || 0) + (site.coreUpdate ? 1 : 0);
         const statusLabel =
           site.status === 'online'
-            ? 'Online'
+            ? t('statusOnline')
             : site.status === 'auth_error'
-            ? 'Auth-Fehler'
+            ? t('statusAuthError')
             : site.status === 'offline'
-            ? 'Offline'
-            : 'Ungeprüft';
+            ? t('statusOffline')
+            : t('statusUnchecked');
+
+        const updateBadgeText =
+          totalUpdates === 1 ? t('updateSingle') : t('updatePlural', [String(totalUpdates)]);
 
         return `
           <article class="sp-card">
@@ -117,7 +120,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="sp-card__url">${escapeHtml(cleanUrl)}</div>
               </div>
               <span class="owpd-badge owpd-badge--${site.status || 'neutral'}">
-                <span class="owpd-dot"></span>${statusLabel}
+                <span class="owpd-dot"></span>${escapeHtml(statusLabel)}
               </span>
             </div>
 
@@ -126,7 +129,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               ${site.phpVersion ? `<span class="owpd-badge owpd-badge--neutral">PHP ${escapeHtml(site.phpVersion.split('-')[0])}</span>` : ''}
               ${
                 totalUpdates > 0
-                  ? `<span class="owpd-badge owpd-badge--updates">${totalUpdates} Update${totalUpdates > 1 ? 's' : ''}</span>`
+                  ? `<span class="owpd-badge owpd-badge--updates">${escapeHtml(updateBadgeText)}</span>`
                   : ''
               }
             </div>
@@ -135,13 +138,13 @@ document.addEventListener('DOMContentLoaded', async () => {
               <div class="sp-card__quicklinks">
                 ${
                   site.username && site.appPassword
-                    ? `<button class="owpd-btn owpd-btn--success owpd-btn--sm" data-action="autologin" data-id="${site.id}" title="1-Click Admin Login">Login</button>`
-                    : `<a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/wp-admin/" target="_blank" rel="noopener">Admin</a>`
+                    ? `<button class="owpd-btn owpd-btn--success owpd-btn--sm" data-action="autologin" data-id="${site.id}" title="${escapeHtml(t('oneClickLogin'))}">${escapeHtml(t('loginShort'))}</button>`
+                    : `<a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/wp-admin/" target="_blank" rel="noopener">${escapeHtml(t('adminShort'))}</a>`
                 }
-                <a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/wp-admin/plugins.php" target="_blank" rel="noopener">Plugins</a>
+                <a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/wp-admin/plugins.php" target="_blank" rel="noopener">${escapeHtml(t('plugins'))}</a>
               </div>
               <button class="owpd-btn owpd-btn--primary owpd-btn--sm" data-action="details" data-id="${site.id}">
-                Details →
+                ${escapeHtml(t('detailsArrow'))}
               </button>
             </div>
           </article>
@@ -177,20 +180,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     activeTabBox.innerHTML = `
       <section class="sp-active-context">
-        <div class="sp-active-context__label">Aktiver Tab erkannt</div>
+        <div class="sp-active-context__label">${escapeHtml(t('activeTabDetected'))}</div>
         <div class="sp-active-context__title">${escapeHtml(matched.name)}</div>
         <div class="sp-active-context__links">
           ${
             matched.username && matched.appPassword
-              ? `<button class="owpd-btn owpd-btn--primary owpd-btn--sm" data-action="autologin" data-id="${matched.id}">1-Click Login</button>`
+              ? `<button class="owpd-btn owpd-btn--primary owpd-btn--sm" data-action="autologin" data-id="${matched.id}">${escapeHtml(t('oneClickLogin'))}</button>`
               : `<a class="owpd-btn owpd-btn--primary owpd-btn--sm" href="${cleanUrl}/wp-admin/" target="_blank">WP-Admin</a>`
           }
           ${
             matched.bricksActive && bricksEditUrl
-              ? `<a class="owpd-btn owpd-btn--sm" href="${bricksEditUrl}" target="_blank">Bricks Editor</a>`
+              ? `<a class="owpd-btn owpd-btn--sm" href="${bricksEditUrl}" target="_blank">${escapeHtml(t('bricksEditor'))}</a>`
               : ''
           }
-          <a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/wp-admin/update-core.php" target="_blank">Updates</a>
+          <a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/wp-admin/update-core.php" target="_blank">${escapeHtml(t('updates'))}</a>
         </div>
       </section>
     `;
@@ -206,7 +209,7 @@ async function triggerOneClickLogin(siteId, btnEl) {
 
   const originalText = btnEl.textContent;
   btnEl.disabled = true;
-  btnEl.textContent = 'Token...';
+  btnEl.textContent = t('tokenLoading');
 
   try {
     const cleanUrl = site.url.replace(/\/$/, '');
@@ -225,7 +228,7 @@ async function triggerOneClickLogin(siteId, btnEl) {
       await chrome.tabs.create({ url: data.login_url });
     }
   } catch (err) {
-    alert(`1-Click-Login fehlgeschlagen (${err.message}). Prüfe OWPD Companion & Application Password.`);
+    alert(t('loginFailed', [err.message]));
   } finally {
     btnEl.disabled = false;
     btnEl.textContent = originalText;
