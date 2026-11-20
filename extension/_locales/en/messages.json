@@ -1,6 +1,6 @@
 {
   "extName": { "message": "Olpo's WordPressDock" },
-  "extDescription": { "message": "Quick side panel view & full-screen dashboard for your WordPress installations." },
+  "extDescription": { "message": "Manage your Wordpress installations in the browser." },
   "actionTitle": { "message": "Open Olpo's WordPressDock" },
   "toggleTheme": { "message": "Toggle theme" },
   "refreshAll": { "message": "Check all" },
