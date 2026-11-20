@@ -84,12 +84,33 @@
             <h2 class="owpd-settings-section__title" data-i18n="settingsAccentColor">Primary Accent Color</h2>
             <div class="owpd-swatch-grid" id="settings-accent-grid"></div>
           </div>
+
+          <div class="owpd-settings-section">
+            <h2 class="owpd-settings-section__title" data-i18n="settingsNotifications">Desktop Notifications</h2>
+            <div class="owpd-toggle-list">
+              <label class="owpd-toggle-row">
+                <div>
+                  <div class="owpd-toggle-row__title" data-i18n="notifyOfflineLabel">Alert when a site goes offline</div>
+                  <div class="owpd-toggle-row__desc" data-i18n="notifyOfflineDesc">Triggers a system notification if a site becomes unreachable or returns an error.</div>
+                </div>
+                <input type="checkbox" id="setting-notify-offline" class="owpd-switch" checked>
+              </label>
+
+              <label class="owpd-toggle-row">
+                <div>
+                  <div class="owpd-toggle-row__title" data-i18n="notifyUpdatesLabel">Alert on new available updates</div>
+                  <div class="owpd-toggle-row__desc" data-i18n="notifyUpdatesDesc">Shows the number of pending core, plugin, or theme updates.</div>
+                </div>
+                <input type="checkbox" id="setting-notify-updates" class="owpd-switch" checked>
+              </label>
+            </div>
+          </div>
         </div>
       </div>
     </main>
   </div>
 
-  <!-- MODAL -->
+  <!-- MODAL: DETAILANSICHT & BEARBEITEN -->
   <div id="db-modal-backdrop" class="owpd-modal-backdrop">
     <div class="owpd-modal">
       <div class="owpd-modal__header">
