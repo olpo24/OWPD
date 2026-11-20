@@ -4,12 +4,28 @@
   <meta charset="UTF-8">
   <title>OWPD – Olpo's WordPressDock</title>
   <link rel="stylesheet" href="style.css">
+  <script src="theme.js"></script>
 </head>
 <body class="sp-body">
   <header class="sp-header">
-    <h1 class="sp-header__brand">
-      OWPD <span class="sp-header__tag">WordPressDock</span>
-    </h1>
+    <div class="sp-header__brand-wrap">
+      <svg class="owpd-logo" viewBox="0 0 32 32" aria-hidden="true">
+        <defs>
+          <linearGradient id="spLogoGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="var(--logo-1)"/>
+            <stop offset="100%" stop-color="var(--logo-2)"/>
+          </linearGradient>
+        </defs>
+        <rect width="32" height="32" rx="8" fill="url(#spLogoGrad)"/>
+        <circle cx="14.5" cy="17.5" r="7.5" class="owpd-logo__line"/>
+        <path d="M10.8 15.2 L12.8 20.2 L14.5 16.5 L16.2 20.2 L18.2 15.2" class="owpd-logo__line--w"/>
+        <circle cx="24" cy="8" r="2.6" class="owpd-logo__dot"/>
+      </svg>
+      <h1 class="sp-header__brand">
+        OWPD
+        <span class="sp-header__tag">WordPressDock</span>
+      </h1>
+    </div>
     <div class="sp-header__actions">
       <button id="sp-theme-toggle" class="owpd-btn owpd-btn--sm" data-i18n-title="toggleTheme">◐</button>
       <button id="sp-refresh-all" class="owpd-btn owpd-btn--sm" data-i18n-title="refreshAll">↻</button>
