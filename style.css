@@ -817,3 +817,71 @@ body {
   border: 1px dashed var(--border-color);
   border-radius: var(--radius-md);
 }
+/* --- Notification Toggle Rows --- */
+.owpd-toggle-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.owpd-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.6rem;
+  padding: 1.1rem 1.3rem;
+  background: var(--bg-surface-alt);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color var(--transition);
+}
+
+.owpd-toggle-row:hover {
+  border-color: var(--border-strong);
+}
+
+.owpd-toggle-row__title {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.owpd-toggle-row__desc {
+  font-size: 1.15rem;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+.owpd-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 3.6rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: var(--border-strong);
+  position: relative;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.owpd-switch::after {
+  content: "";
+  position: absolute;
+  top: 0.25rem;
+  left: 0.25rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: #ffffff;
+  transition: transform var(--transition);
+}
+
+.owpd-switch:checked {
+  background: var(--primary);
+}
+
+.owpd-switch:checked::after {
+  transform: translateX(1.6rem);
+}
