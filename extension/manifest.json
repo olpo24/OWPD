@@ -30,9 +30,9 @@
     }
   },
   "side_panel": {
-    "default_path": "sidepanel.html"
+    "default_path": "views/sidepanel.html"
   },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "js/background.js"
   }
 }

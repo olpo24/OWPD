@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <title>OWPD – Olpo's WordPressDock Dashboard</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="theme.js"></script>
+  <link rel="stylesheet" href="../css/style.css">
+  <script src="../js/themes.js"></script>
 </head>
 <body>
   <div class="db-layout">
@@ -104,6 +104,12 @@
                 <input type="checkbox" id="setting-notify-updates" class="owpd-switch" checked>
               </label>
             </div>
+
+            <div style="margin-top: 1.2rem; display: flex; justify-content: flex-end;">
+              <button type="button" id="btn-test-notification" class="owpd-btn owpd-btn--sm" data-i18n="testNotificationBtn">
+                Send test notification
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -164,7 +170,7 @@
     </div>
   </div>
 
-  <script src="i18n.js"></script>
-  <script src="dashboard.js"></script>
+  <script src="../js/i18n.js"></script>
+  <script src="../js/dashboard.js"></script>
 </body>
 </html>

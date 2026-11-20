@@ -9,7 +9,6 @@ const ACCENT_BADGE_COLORS = {
   'crimson-rose': '#e11d48'
 };
 
-// Merkt sich die Zuordnung Notification-ID -> Site-ID für Klicks
 const notificationSiteMap = new Map();
 
 function msg(key, substitutions = []) {
@@ -43,7 +42,6 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
-// Klick auf Desktop-Benachrichtigung öffnet direkt die betroffene Seite im Dashboard
 chrome.notifications.onClicked.addListener(async (notificationId) => {
   const siteId = notificationSiteMap.get(notificationId) || null;
   await openOrFocusDashboard(siteId);
@@ -78,10 +76,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     openOrFocusDashboard(message.siteId || null).then(() => sendResponse({ ok: true }));
     return true;
   }
+
+  if (message.type === 'SEND_TEST_NOTIFICATION') {
+    const notifId = `owpd-test-${Date.now()}`;
+    chrome.notifications.create(notifId, {
+      type: 'basic',
+      iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+      title: msg('notifTestTitle'),
+      message: msg('notifTestBody'),
+      priority: 1
+    });
+    sendResponse({ ok: true });
+    return true;
+  }
 });
 
 async function openOrFocusDashboard(siteId) {
-  const baseUrl = chrome.runtime.getURL('dashboard.html');
+  const baseUrl = chrome.runtime.getURL('views/dashboard.html');
   const targetUrl = siteId ? `${baseUrl}#site=${encodeURIComponent(siteId)}` : baseUrl;
 
   const existingTabs = await chrome.tabs.query({ url: `${baseUrl}*` });
@@ -105,7 +116,6 @@ function isSiteOfflineOrError(site) {
 async function evaluateSiteNotifications(previousSite, updatedSite, prefs) {
   const { notifyOffline = true, notifyUpdates = true } = prefs;
 
-  // 1. Offline- / Fehler-Benachrichtigung (nur wenn Seite vorher NICHT schon offline/fehlerhaft war)
   if (notifyOffline && isSiteOfflineOrError(updatedSite) && !isSiteOfflineOrError(previousSite)) {
     const notifId = `owpd-offline-${updatedSite.id}-${Date.now()}`;
     notificationSiteMap.set(notifId, updatedSite.id);
@@ -119,7 +129,6 @@ async function evaluateSiteNotifications(previousSite, updatedSite, prefs) {
     });
   }
 
-  // 2. Update-Benachrichtigung (nur wenn Updates vorhanden sind UND Anzahl gegenüber letztem Check gestiegen ist)
   const prevUpdates = getSiteUpdateCount(previousSite);
   const nextUpdates = getSiteUpdateCount(updatedSite);
 
