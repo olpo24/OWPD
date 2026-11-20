@@ -1,12 +1,48 @@
+// 'dot' = kompakter Punkt auf dem Icon | 'count' = genaue Anzahl (z. B. "3")
+const BADGE_STYLE = 'dot';
+
+const ACCENT_BADGE_COLORS = {
+  'carbon-orange': '#e8501f',
+  'electric-cobalt': '#2563eb',
+  'emerald-mint': '#059669',
+  'amber-volt': '#d97706',
+  'cyber-violet': '#7c3aed',
+  'crimson-rose': '#e11d48'
+};
+
 chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
   .catch((err) => console.error('OWPD SidePanel Error:', err));
 
-chrome.alarms.create('owpdAutoCheck', { periodInMinutes: 60 });
+async function ensureAlarm() {
+  const existing = await chrome.alarms.get('owpdAutoCheck');
+  if (!existing) {
+    chrome.alarms.create('owpdAutoCheck', { periodInMinutes: 60 });
+  }
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+  ensureAlarm();
+  checkAllStoredSites();
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  ensureAlarm();
+  checkAllStoredSites();
+});
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'owpdAutoCheck') {
     checkAllStoredSites();
+  }
+});
+
+// Badge live aktualisieren, wenn Sites oder Akzentfarbe geändert werden
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && (changes.sites || changes.accentColor)) {
+    chrome.storage.local.get(['sites', 'accentColor']).then(({ sites = [], accentColor }) => {
+      updateExtensionBadge(sites, accentColor);
+    });
   }
 });
 
@@ -107,36 +143,57 @@ async function fetchSiteStatus(site) {
 }
 
 async function checkSingleSiteById(siteId) {
-  const { sites = [] } = await chrome.storage.local.get('sites');
+  const { sites = [], accentColor } = await chrome.storage.local.get(['sites', 'accentColor']);
   const idx = sites.findIndex((s) => s.id === siteId);
   if (idx === -1) return null;
 
   sites[idx] = await fetchSiteStatus(sites[idx]);
   await chrome.storage.local.set({ sites });
-  updateExtensionBadge(sites);
+  await updateExtensionBadge(sites, accentColor);
   return sites[idx];
 }
 
 async function checkAllStoredSites() {
-  const { sites = [] } = await chrome.storage.local.get('sites');
+  const { sites = [], accentColor } = await chrome.storage.local.get(['sites', 'accentColor']);
   const updated = [];
   for (const site of sites) {
     updated.push(await fetchSiteStatus(site));
   }
   await chrome.storage.local.set({ sites: updated });
-  updateExtensionBadge(updated);
+  await updateExtensionBadge(updated, accentColor);
   return updated;
 }
 
-function updateExtensionBadge(sites) {
+async function updateExtensionBadge(sites, accentColor = 'carbon-orange') {
   let totalUpdates = 0;
+  let offlineCount = 0;
+
   for (const s of sites) {
+    if (s.status === 'offline' || s.status === 'error' || s.status === 'auth_error') {
+      offlineCount++;
+    }
     totalUpdates += (s.pluginsCount || 0) + (s.themesCount || 0) + (s.coreUpdate ? 1 : 0);
   }
-  if (totalUpdates > 0) {
-    chrome.action.setBadgeText({ text: String(totalUpdates) });
-    chrome.action.setBadgeBackgroundColor({ color: '#f59e0b' });
-  } else {
-    chrome.action.setBadgeText({ text: '' });
+
+  // Priorität 1: Eine Seite ist offline oder hat einen Auth-Fehler -> Roter Alert-Dot
+  if (offlineCount > 0) {
+    await chrome.action.setBadgeText({ text: BADGE_STYLE === 'dot' ? '•' : '!' });
+    await chrome.action.setBadgeBackgroundColor({ color: '#d12a2a' });
+    await chrome.action.setBadgeTextColor({ color: '#ffffff' });
+    return;
   }
+
+  // Priorität 2: Neue Updates verfügbar -> Dot oder Zähler in der gewählten Akzentfarbe
+  if (totalUpdates > 0) {
+    const badgeColor = ACCENT_BADGE_COLORS[accentColor] || ACCENT_BADGE_COLORS['carbon-orange'];
+    await chrome.action.setBadgeText({
+      text: BADGE_STYLE === 'dot' ? '•' : String(totalUpdates)
+    });
+    await chrome.action.setBadgeBackgroundColor({ color: badgeColor });
+    await chrome.action.setBadgeTextColor({ color: '#ffffff' });
+    return;
+  }
+
+  // Alles aktuell & online -> Badge ausblenden
+  await chrome.action.setBadgeText({ text: '' });
 }
