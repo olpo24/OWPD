@@ -74,5 +74,15 @@
   "accentEmerald": { "message": "Emerald Terminal" },
   "accentAmber": { "message": "Amber Volt" },
   "accentViolet": { "message": "Hyper Violet" },
-  "accentCrimson": { "message": "Crimson Pulse" }
+  "accentCrimson": { "message": "Crimson Pulse" },
+  "settingsNotifications": { "message": "Desktop Notifications" },
+  "notifyOfflineLabel": { "message": "Alert when a site goes offline" },
+  "notifyOfflineDesc": { "message": "Triggers a system notification if a site becomes unreachable or returns an error." },
+  "notifyUpdatesLabel": { "message": "Alert on new available updates" },
+  "notifyUpdatesDesc": { "message": "Shows the number of pending core, plugin, or theme updates." },
+  "notifOfflineTitle": { "message": "OWPD Alert: $SITE$ offline", "placeholders": { "site": { "content": "$1" } } },
+  "notifOfflineBody": { "message": "$URL$ is currently unreachable or returned an error. Click to inspect.", "placeholders": { "url": { "content": "$1" } } },
+  "notifUpdatesTitle": { "message": "OWPD Updates: $SITE$", "placeholders": { "site": { "content": "$1" } } },
+  "notifUpdatesBodySingle": { "message": "1 new update is available for $SITE$.", "placeholders": { "site": { "content": "$1" } } },
+  "notifUpdatesBodyPlural": { "message": "$COUNT$ updates are available for $SITE$.", "placeholders": { "site": { "content": "$1" }, "count": { "content": "$2" } } }
 }
