@@ -1,6 +1,8 @@
 let currentFilter = 'all';
 
 document.addEventListener('DOMContentLoaded', async () => {
+  const sitesView = document.getElementById('db-sites-view');
+  const settingsView = document.getElementById('db-settings-view');
   const gridEl = document.getElementById('db-grid');
   const statsEl = document.getElementById('db-stats');
   const searchInput = document.getElementById('db-search');
@@ -13,22 +15,91 @@ document.addEventListener('DOMContentLoaded', async () => {
   const deleteBtn = document.getElementById('modal-delete-btn');
   const modalCheckBtn = document.getElementById('modal-check-btn');
 
-  const { theme = 'light' } = await chrome.storage.local.get('theme');
-  document.documentElement.setAttribute('data-theme', theme);
+  const THEME_CYCLE = ['system', 'light', 'dark'];
+  const THEME_ICONS = { system: '◐', light: '☀', dark: '☾' };
 
+  async function syncThemeControls() {
+    const { themeMode = 'system', accentColor = 'carbon-orange' } = await chrome.storage.local.get([
+      'themeMode',
+      'accentColor'
+    ]);
+
+    themeToggleBtn.textContent = THEME_ICONS[themeMode] || '◐';
+    themeToggleBtn.title = `${t('toggleTheme')} (${t('theme_' + themeMode)})`;
+
+    document.querySelectorAll('[data-theme-choice]').forEach((btn) => {
+      btn.classList.toggle('owpd-segmented__btn--active', btn.dataset.themeChoice === themeMode);
+    });
+
+    const swatchGrid = document.getElementById('settings-accent-grid');
+    if (swatchGrid) {
+      swatchGrid.innerHTML = Object.entries(OWPD_ACCENTS)
+        .map(([key, cfg]) => {
+          const isActive = key === accentColor;
+          return `
+            <button type="button" class="owpd-swatch-btn ${isActive ? 'owpd-swatch-btn--active' : ''}" data-accent-choice="${key}">
+              <span class="owpd-swatch-btn__dot" style="background: ${cfg.swatch};"></span>
+              <span>${escapeHtml(t(cfg.labelKey))}</span>
+            </button>
+          `;
+        })
+        .join('');
+    }
+  }
+
+  await syncThemeControls();
+
+  // Zyklischer Quick-Toggle oben in der Sidebar
   themeToggleBtn.addEventListener('click', async () => {
-    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    await chrome.storage.local.set({ theme: next });
+    const { themeMode = 'system', accentColor = 'carbon-orange' } = await chrome.storage.local.get([
+      'themeMode',
+      'accentColor'
+    ]);
+    const nextMode = THEME_CYCLE[(THEME_CYCLE.indexOf(themeMode) + 1) % THEME_CYCLE.length];
+    await chrome.storage.local.set({ themeMode: nextMode });
+    applyThemeAndAccent(nextMode, accentColor);
+    await syncThemeControls();
   });
 
+  // Settings: 3-Wege Theme-Auswahl
+  document.getElementById('settings-theme-group').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-theme-choice]');
+    if (!btn) return;
+    const chosenMode = btn.dataset.themeChoice;
+    const { accentColor = 'carbon-orange' } = await chrome.storage.local.get('accentColor');
+    await chrome.storage.local.set({ themeMode: chosenMode });
+    applyThemeAndAccent(chosenMode, accentColor);
+    await syncThemeControls();
+  });
+
+  // Settings: Akzentfarben-Auswahl
+  document.getElementById('settings-accent-grid').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-accent-choice]');
+    if (!btn) return;
+    const chosenAccent = btn.dataset.accentChoice;
+    const { themeMode = 'system' } = await chrome.storage.local.get('themeMode');
+    await chrome.storage.local.set({ accentColor: chosenAccent });
+    applyThemeAndAccent(themeMode, chosenAccent);
+    await syncThemeControls();
+  });
+
+  // Sidebar-Navigation (Sites vs. Settings)
   document.getElementById('db-category-nav').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-filter]');
     if (!btn) return;
     document.querySelectorAll('.db-nav__item').forEach((el) => el.classList.remove('db-nav__item--active'));
     btn.classList.add('db-nav__item--active');
     currentFilter = btn.dataset.filter;
-    renderDashboard();
+
+    if (currentFilter === 'settings') {
+      sitesView.hidden = true;
+      settingsView.hidden = false;
+      syncThemeControls();
+    } else {
+      settingsView.hidden = true;
+      sitesView.hidden = false;
+      renderDashboard();
+    }
   });
 
   searchInput.addEventListener('input', renderDashboard);
@@ -138,8 +209,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'local' && changes.sites) {
-      renderDashboard();
+    if (area === 'local') {
+      if (changes.themeMode || changes.accentColor) syncThemeControls();
+      if (changes.sites) renderDashboard();
     }
   });
 
