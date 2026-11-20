@@ -6,14 +6,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   const themeToggleBtn = document.getElementById('sp-theme-toggle');
   const activeTabBox = document.getElementById('sp-active-tab-box');
 
-  const { theme = 'light' } = await chrome.storage.local.get('theme');
-  document.documentElement.setAttribute('data-theme', theme);
+  const THEME_CYCLE = ['system', 'light', 'dark'];
+  const THEME_ICONS = { system: '◐', light: '☀', dark: '☾' };
+
+  async function syncThemeButtonLabel() {
+    const { themeMode = 'system' } = await chrome.storage.local.get('themeMode');
+    themeToggleBtn.textContent = THEME_ICONS[themeMode] || '◐';
+    themeToggleBtn.title = `${t('toggleTheme')} (${t('theme_' + themeMode)})`;
+  }
+
+  await syncThemeButtonLabel();
 
   themeToggleBtn.addEventListener('click', async () => {
-    const current = document.documentElement.getAttribute('data-theme');
-    const next = current === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    await chrome.storage.local.set({ theme: next });
+    const { themeMode = 'system', accentColor = 'carbon-orange' } = await chrome.storage.local.get([
+      'themeMode',
+      'accentColor'
+    ]);
+    const nextMode = THEME_CYCLE[(THEME_CYCLE.indexOf(themeMode) + 1) % THEME_CYCLE.length];
+    await chrome.storage.local.set({ themeMode: nextMode });
+    applyThemeAndAccent(nextMode, accentColor);
+    await syncThemeButtonLabel();
   });
 
   openDashboardBtn.addEventListener('click', () => {
@@ -32,12 +44,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local') {
-      if (changes.theme) {
-        document.documentElement.setAttribute('data-theme', changes.theme.newValue);
-      }
-      if (changes.sites) {
-        render();
-      }
+      if (changes.themeMode) syncThemeButtonLabel();
+      if (changes.sites) render();
     }
   });
 
@@ -117,7 +125,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="sp-card__top">
               <div>
                 <h2 class="sp-card__name">${escapeHtml(site.name)}</h2>
-                <div class="sp-card__url">${escapeHtml(cleanUrl)}</div>
+                <a href="${cleanUrl}" target="_blank" rel="noopener" class="sp-card__url">${escapeHtml(cleanUrl)}</a>
               </div>
               <span class="owpd-badge owpd-badge--${site.status || 'neutral'}">
                 <span class="owpd-dot"></span>${escapeHtml(statusLabel)}
