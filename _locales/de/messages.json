@@ -74,5 +74,15 @@
   "accentEmerald": { "message": "Emerald Terminal" },
   "accentAmber": { "message": "Amber Volt" },
   "accentViolet": { "message": "Hyper Violet" },
-  "accentCrimson": { "message": "Crimson Pulse" }
+  "accentCrimson": { "message": "Crimson Pulse" },
+  "settingsNotifications": { "message": "Desktop-Benachrichtigungen" },
+  "notifyOfflineLabel": { "message": "Benachrichtigen, wenn eine Seite offline geht" },
+  "notifyOfflineDesc": { "message": "Sendet eine Systemmeldung, sobald eine Seite nicht mehr erreichbar ist oder einen Fehler liefert." },
+  "notifyUpdatesLabel": { "message": "Bei neuen Updates benachrichtigen" },
+  "notifyUpdatesDesc": { "message": "Zeigt die Anzahl ausstehender Core-, Plugin- oder Theme-Updates an." },
+  "notifOfflineTitle": { "message": "OWPD Warnung: $SITE$ offline", "placeholders": { "site": { "content": "$1" } } },
+  "notifOfflineBody": { "message": "$URL$ ist aktuell nicht erreichbar. Klicken, um Details zu öffnen.", "placeholders": { "url": { "content": "$1" } } },
+  "notifUpdatesTitle": { "message": "OWPD Updates: $SITE$", "placeholders": { "site": { "content": "$1" } } },
+  "notifUpdatesBodySingle": { "message": "Für $SITE$ ist 1 neues Update verfügbar.", "placeholders": { "site": { "content": "$1" } } },
+  "notifUpdatesBodyPlural": { "message": "Für $SITE$ sind $COUNT$ Updates verfügbar.", "placeholders": { "site": { "content": "$1" }, "count": { "content": "$2" } } }
 }
