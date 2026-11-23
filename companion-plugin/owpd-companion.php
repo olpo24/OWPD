@@ -80,6 +80,12 @@ add_filter( 'determine_current_user', function ( $user_id ) {
 
 	return $user_id;
 }, 20 );
+
+add_filter( 'rest_allowed_cors_headers', function ( $allow_headers ) {
+	$allow_headers[] = 'X-OWPD-Authorization';
+	return $allow_headers;
+} );
+
 add_action('rest_api_init', function () {
     register_rest_route('owpd/v1', '/status', [
         'methods'             => 'GET',
