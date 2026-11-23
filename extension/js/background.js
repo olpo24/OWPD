@@ -160,6 +160,7 @@ async function fetchSiteStatus(site) {
   if (hasAuth) {
     const token = btoa(`${site.username}:${site.appPassword}`);
     headers.Authorization = `Basic ${token}`;
+    headers['X-OWPD-Authorization'] = `Basic ${token}`;
   }
 
   try {
