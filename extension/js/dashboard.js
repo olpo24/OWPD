@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const modalCheckBtn = document.getElementById('modal-check-btn');
   const notifyOfflineToggle = document.getElementById('setting-notify-offline');
   const notifyUpdatesToggle = document.getElementById('setting-notify-updates');
+  const testNotifBtn = document.getElementById('btn-test-notification');
 
   const THEME_CYCLE = ['system', 'light', 'dark'];
   const THEME_ICONS = { system: '◐', light: '☀', dark: '☾' };
@@ -102,6 +103,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   notifyUpdatesToggle?.addEventListener('change', async (e) => {
     await chrome.storage.local.set({ notifyUpdates: e.target.checked });
+  });
+
+  testNotifBtn?.addEventListener('click', async () => {
+    testNotifBtn.disabled = true;
+    const originalLabel = testNotifBtn.textContent;
+    testNotifBtn.textContent = t('testNotificationSent');
+
+    await chrome.runtime.sendMessage({ type: 'SEND_TEST_NOTIFICATION' });
+
+    setTimeout(() => {
+      testNotifBtn.disabled = false;
+      testNotifBtn.textContent = originalLabel;
+    }, 1800);
   });
 
   // Sidebar-Navigation (Sites vs. Settings)
@@ -385,7 +399,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       const formattedDate = site.lastChecked ? new Date(site.lastChecked).toLocaleString(dateLocale) : '–';
 
       const pluginItems = (site.pluginsUpdates || [])
-        .map((p) => `<li><span>Plugin: <strong>${escapeHtml(p.name)}</strong></span><span>${escapeHtml(p.version)} → <strong>${escapeHtml(p.new_version)}</strong></span></li>`) .join(''); const themeItems = (site.themesUpdates \vert{}\vert{} []) .map((tItem) => `<li><span>Theme: <strong>${escapeHtml(tItem.name)}</strong></span><span>${escapeHtml(tItem.version)} → <strong>${escapeHtml(tItem.new_version)}</strong></span></li>`)
+        .map((p) => `<li><span>Plugin: <strong>${escapeHtml(p.name)}</strong></span><span>${escapeHtml(p.version)} → <strong>${escapeHtml(p.new_version)}</strong></span></li>`)
+        .join('');
+      const themeItems = (site.themesUpdates || [])
+        .map((tItem) => `<li><span>Theme: <strong>${escapeHtml(tItem.name)}</strong></span><span>${escapeHtml(tItem.version)} → <strong>${escapeHtml(tItem.new_version)}</strong></span></li>`)
         .join('');
       const coreItem = site.coreUpdate
         ? `<li><span><strong>WordPress Core</strong></span><span>${escapeHtml(site.wpVersion)} → <strong>${escapeHtml(site.newWpVersion)}</strong></span></li>`
@@ -395,4 +412,80 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       liveDetailsEl.innerHTML = `
         <div style="padding: 1.4rem; background: var(--bg-surface-alt); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
-          <div style="display: flex; justify-content: space-between;
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem;">
+            <strong>${escapeHtml(t('pendingUpdatesTitle'))}</strong>
+            <span style="font-size: 1.2rem; color: var(--text-muted);">
+              ${escapeHtml(t('lastCheck', [formattedDate]))}
+            </span>
+          </div>
+          ${
+            allItems
+              ? `<ul class="owpd-update-list">${allItems}</ul>`
+              : `<div style="color: var(--success); font-size: 1.3rem;">${escapeHtml(t('allUpToDateMsg'))}</div>`
+          }
+        </div>
+      `;
+    } else if (site) {
+      liveDetailsEl.innerHTML = `
+        <div style="padding: 1.2rem; background: var(--bg-surface-alt); border: 1px solid var(--border-color); border-radius: var(--radius-md); font-size: 1.3rem; color: var(--text-muted);">
+          ${escapeHtml(t('companionHint'))}
+        </div>
+      `;
+    } else {
+      liveDetailsEl.innerHTML = '';
+    }
+
+    modalBackdrop.classList.add('owpd-modal-backdrop--open');
+  }
+
+  function closeSiteModal() {
+    modalBackdrop.classList.remove('owpd-modal-backdrop--open');
+    if (window.location.hash) {
+      history.replaceState(null, '', window.location.pathname);
+    }
+  }
+});
+
+async function triggerOneClickLogin(siteId, btnEl) {
+  const { sites = [] } = await chrome.storage.local.get('sites');
+  const site = sites.find((s) => s.id === siteId);
+  if (!site || !site.username || !site.appPassword) return;
+
+  const originalText = btnEl.textContent;
+  btnEl.disabled = true;
+  btnEl.textContent = t('tokenLoading');
+
+  try {
+    const cleanUrl = site.url.replace(/\/$/, '');
+    const token = btoa(`${site.username}:${site.appPassword}`);
+    const res = await fetch(`${cleanUrl}/wp-json/owpd/v1/login-token`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${token}`,
+        'X-OWPD-Authorization': `Basic ${token}`,
+        Accept: 'application/json'
+      }
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.login_url) {
+      await chrome.tabs.create({ url: data.login_url });
+    }
+  } catch (err) {
+    alert(t('loginFailed', [err.message]));
+  } finally {
+    btnEl.disabled = false;
+    btnEl.textContent = originalText;
+  }
+}
+
+function escapeHtml(str) {
+  return String(str || '').replace(/[&<>"']/g, (m) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[m]));
+}
