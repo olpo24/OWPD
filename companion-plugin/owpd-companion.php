@@ -40,7 +40,46 @@ add_filter('gettext', function ($translated, $text, $domain) {
 
     return $de_map[$text] ?? $translated;
 }, 10, 3);
+/**
+ * Fallback-Authentifizierung über X-OWPD-Authorization für Server/Proxies,
+ * die den Standard-Authorization-Header unter PHP-FPM/FastCGI verwerfen.
+ */
+add_filter( 'determine_current_user', function ( $user_id ) {
+	if ( ! empty( $user_id ) ) {
+		return $user_id;
+	}
 
+	// Nur für OWPD REST-Requests greifen
+	$request_uri = $_SERVER['REQUEST_URI'] ?? '';
+	if ( strpos( $request_uri, '/wp-json/owpd/v1/' ) === false ) {
+		return $user_id;
+	}
+
+	$auth_header = '';
+	if ( ! empty( $_SERVER['HTTP_X_OWPD_AUTHORIZATION'] ) ) {
+		$auth_header = $_SERVER['HTTP_X_OWPD_AUTHORIZATION'];
+	} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
+		$auth_header = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+	}
+
+	if ( stripos( $auth_header, 'Basic ' ) !== 0 ) {
+		return $user_id;
+	}
+
+	$decoded = base64_decode( substr( $auth_header, 6 ), true );
+	if ( ! $decoded || strpos( $decoded, ':' ) === false ) {
+		return $user_id;
+	}
+
+	list( $username, $password ) = explode( ':', $decoded, 2 );
+	$user = wp_authenticate_application_password( null, $username, $password );
+
+	if ( $user instanceof WP_User ) {
+		return $user->ID;
+	}
+
+	return $user_id;
+}, 20 );
 add_action('rest_api_init', function () {
     register_rest_route('owpd/v1', '/status', [
         'methods'             => 'GET',
