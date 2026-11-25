@@ -1,55 +1,32 @@
 <?php
 /**
- * Plugin Name: OWPD Companion (Olpo's WordPressDock)
- * Description: Lightweight REST endpoint for status checks (WP, PHP, updates) and 30s one-click login.
+ * Plugin Name: OWPD Companion
+ * Description: Lightweight REST API companion for Olpo's WordPressDock (OWPD) browser extension.
  * Version: 1.1.0
- * Author: Ole Poetter (olpo24)
- * Text Domain: owpd-companion
- * Domain Path: /languages
+ * Author: Ole Poetter
+ * Author URI: https://olpo.de
  */
 
-if (!defined('ABSPATH')) {
-    exit;
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
 }
 
+define( 'OWPD_VERSION', '1.1.0' );
+
 /**
- * Load standard translations if .mo files exist, plus built-in German fallback
- * so single-file / mu-plugin deployments work out of the box without extra files.
+ * Stellt sicher, dass Application Passwords auf HTTPS-Seiten verfügbar sind.
  */
-add_action('init', function () {
-    load_plugin_textdomain('owpd-companion', false, dirname(plugin_basename(__FILE__)) . '/languages');
-});
+add_filter( 'wp_is_application_passwords_available', '__return_true', 99 );
 
-add_filter('gettext', function ($translated, $text, $domain) {
-    if ($domain !== 'owpd-companion') {
-        return $translated;
-    }
-
-    $locale = function_exists('determine_locale') ? determine_locale() : get_locale();
-    if (strpos((string) $locale, 'de') !== 0) {
-        return $translated;
-    }
-
-    $de_map = [
-        'No valid user.'                           => 'Kein gültiger Benutzer.',
-        'Invalid login token.'                     => 'Ungültiges Login-Token.',
-        'Login token expired or already used.'     => 'Login-Token abgelaufen oder bereits verwendet.',
-        'Permission denied.'                       => 'Berechtigung verweigert.',
-        'Lightweight REST endpoint for status checks (WP, PHP, updates) and 30s one-click login.' => 'Schlanker REST-Endpunkt für Status-Checks (WP, PHP, Updates) und 30s One-Click-Login.',
-    ];
-
-    return $de_map[$text] ?? $translated;
-}, 10, 3);
 /**
- * Fallback-Authentifizierung über X-OWPD-Authorization für Server/Proxies,
- * die den Standard-Authorization-Header unter PHP-FPM/FastCGI verwerfen.
+ * Authentifizierung über X-OWPD-Authorization (Priorität 5, vor WP-Standard-Auth),
+ * damit Webserver/Proxies (PHP-FPM/FastCGI/Nginx) den Header nicht verwerfen können.
  */
 add_filter( 'determine_current_user', function ( $user_id ) {
 	if ( ! empty( $user_id ) ) {
 		return $user_id;
 	}
 
-	// Nur für OWPD REST-Requests greifen
 	$request_uri = $_SERVER['REQUEST_URI'] ?? '';
 	if ( strpos( $request_uri, '/wp-json/owpd/v1/' ) === false ) {
 		return $user_id;
@@ -58,6 +35,8 @@ add_filter( 'determine_current_user', function ( $user_id ) {
 	$auth_header = '';
 	if ( ! empty( $_SERVER['HTTP_X_OWPD_AUTHORIZATION'] ) ) {
 		$auth_header = $_SERVER['HTTP_X_OWPD_AUTHORIZATION'];
+	} elseif ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
+		$auth_header = $_SERVER['HTTP_AUTHORIZATION'];
 	} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
 		$auth_header = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
 	}
@@ -72,139 +51,173 @@ add_filter( 'determine_current_user', function ( $user_id ) {
 	}
 
 	list( $username, $password ) = explode( ':', $decoded, 2 );
+	$password = preg_replace( '/\s+/', '', $password );
+
+	// Temporär eigenen Filter pausieren, um Rekursion zu verhindern
+	remove_filter( 'determine_current_user', __FUNCTION__, 5 );
 	$user = wp_authenticate_application_password( null, $username, $password );
+	add_filter( 'determine_current_user', __FUNCTION__, 5 );
 
 	if ( $user instanceof WP_User ) {
 		return $user->ID;
 	}
 
 	return $user_id;
-}, 20 );
+}, 5 );
 
+/**
+ * CORS-Header für Chrome/Edge Extension Requests freigeben.
+ */
 add_filter( 'rest_allowed_cors_headers', function ( $allow_headers ) {
+	$allow_headers[] = 'Authorization';
 	$allow_headers[] = 'X-OWPD-Authorization';
 	return $allow_headers;
 } );
 
-add_action('rest_api_init', function () {
-    register_rest_route('owpd/v1', '/status', [
-        'methods'             => 'GET',
-        'callback'            => 'owpd_get_site_status',
-        'permission_callback' => function () {
-            return current_user_can('manage_options');
-        },
-    ]);
+/**
+ * REST-API Endpunkte registrieren.
+ */
+add_action( 'rest_api_init', function () {
+	register_rest_route( 'owpd/v1', '/status', [
+		'methods'             => 'GET',
+		'callback'            => 'owpd_rest_get_status',
+		'permission_callback' => function () {
+			return is_user_logged_in() && current_user_can( 'manage_options' );
+		},
+	] );
 
-    register_rest_route('owpd/v1', '/login-token', [
-        'methods'             => 'POST',
-        'callback'            => 'owpd_create_login_token',
-        'permission_callback' => function () {
-            return current_user_can('manage_options');
-        },
-    ]);
-});
+	register_rest_route( 'owpd/v1', '/login-token', [
+		'methods'             => 'POST',
+		'callback'            => 'owpd_rest_create_login_token',
+		'permission_callback' => function () {
+			return is_user_logged_in() && current_user_can( 'manage_options' );
+		},
+	] );
+} );
 
-function owpd_get_site_status() {
-    require_once ABSPATH . 'wp-admin/includes/update.php';
-    require_once ABSPATH . 'wp-admin/includes/plugin.php';
+/**
+ * Liefert System- und Update-Status inklusive Übersetzungen zurück.
+ */
+function owpd_rest_get_status() {
+	require_once ABSPATH . 'wp-admin/includes/update.php';
+	require_once ABSPATH . 'wp-admin/includes/plugin.php';
 
-    wp_update_plugins();
-    wp_update_themes();
-    wp_version_check();
+	wp_version_check();
+	wp_update_plugins();
+	wp_update_themes();
 
-    $core_updates   = get_core_updates();
-    $core_available = false;
-    $new_wp_version = get_bloginfo('version');
+	$core_updates = get_core_updates();
+	$core_update  = false;
+	$new_wp_ver   = '';
 
-    if (!empty($core_updates) && isset($core_updates[0]->response) && $core_updates[0]->response === 'upgrade') {
-        $core_available = true;
-        $new_wp_version = $core_updates[0]->current;
-    }
+	if ( ! empty( $core_updates ) && isset( $core_updates[0]->response ) && 'upgrade' === $core_updates[0]->response ) {
+		$core_update = true;
+		$new_wp_ver  = $core_updates[0]->current ?? '';
+	}
 
-    $plugin_updates = get_plugin_updates();
-    $plugins_list   = [];
-    foreach ($plugin_updates as $file => $plugin_data) {
-        $plugins_list[] = [
-            'name'        => $plugin_data->Name,
-            'version'     => $plugin_data->Version,
-            'new_version' => $plugin_data->update->new_version ?? '',
-        ];
-    }
+	$plugin_updates_raw = get_plugin_updates();
+	$plugins_updates    = [];
+	foreach ( $plugin_updates_raw as $plugin_data ) {
+		$plugins_updates[] = [
+			'name'        => $plugin_data->Name ?? '',
+			'version'     => $plugin_data->Version ?? '',
+			'new_version' => $plugin_data->update->new_version ?? '',
+		];
+	}
 
-    $theme_updates = get_theme_updates();
-    $themes_list   = [];
-    foreach ($theme_updates as $slug => $theme_data) {
-        $themes_list[] = [
-            'name'        => $theme_data->get('Name'),
-            'version'     => $theme_data->get('Version'),
-            'new_version' => $theme_data->update['new_version'] ?? '',
-        ];
-    }
+	$theme_updates_raw = get_theme_updates();
+	$themes_updates    = [];
+	foreach ( $theme_updates_raw as $theme_data ) {
+		$themes_updates[] = [
+			'name'        => $theme_data->get( 'Name' ),
+			'version'     => $theme_data->get( 'Version' ),
+			'new_version' => $theme_data->update['new_version'] ?? '',
+		];
+	}
 
-    return rest_ensure_response([
-        'site_name'       => get_bloginfo('name'),
-        'wp_version'      => get_bloginfo('version'),
-        'php_version'     => PHP_VERSION,
-        'core_update'     => $core_available,
-        'new_wp_version'  => $new_wp_version,
-        'plugins_count'   => count($plugins_list),
-        'plugins_updates' => $plugins_list,
-        'themes_count'    => count($themes_list),
-        'themes_updates'  => $themes_list,
-        'bricks_active'   => defined('BRICKS_VERSION'),
-        'bricks_version'  => defined('BRICKS_VERSION') ? BRICKS_VERSION : null,
-        'timestamp'       => time(),
-    ]);
+	$translation_updates_raw = wp_get_translation_updates();
+	$translations_updates    = [];
+	foreach ( $translation_updates_raw as $tr ) {
+		$translations_updates[] = [
+			'type'     => $tr->type ?? 'core',
+			'slug'     => $tr->slug ?? '',
+			'language' => $tr->language ?? '',
+			'version'  => $tr->version ?? '',
+		];
+	}
+
+	$active_theme   = wp_get_theme();
+	$template_slug  = strtolower( (string) $active_theme->get_template() );
+	$bricks_active  = ( 'bricks' === $template_slug );
+	$bricks_version = '';
+
+	if ( $bricks_active ) {
+		$parent_theme   = $active_theme->parent() ? $active_theme->parent() : $active_theme;
+		$bricks_version = (string) $parent_theme->get( 'Version' );
+	}
+
+	return rest_ensure_response( [
+		'status'               => 'ok',
+		'owpd_version'         => OWPD_VERSION,
+		'wp_version'           => get_bloginfo( 'version' ),
+		'php_version'          => PHP_VERSION,
+		'core_update'          => $core_update,
+		'new_wp_version'       => $new_wp_ver,
+		'plugins_count'        => count( $plugins_updates ),
+		'plugins_updates'      => $plugins_updates,
+		'themes_count'         => count( $themes_updates ),
+		'themes_updates'       => $themes_updates,
+		'translations_count'   => count( $translations_updates ),
+		'translations_updates' => $translations_updates,
+		'bricks_active'        => $bricks_active,
+		'bricks_version'       => $bricks_version,
+	] );
 }
 
-function owpd_create_login_token() {
-    $user_id = get_current_user_id();
-    if (!$user_id) {
-        return new WP_Error('no_user', __('No valid user.', 'owpd-companion'), ['status' => 403]);
-    }
+/**
+ * Erzeugt einen einmaligen, 60 Sekunden gültigen Auto-Login-Link.
+ */
+function owpd_rest_create_login_token() {
+	$user_id = get_current_user_id();
+	if ( ! $user_id ) {
+		return new WP_Error( 'owpd_no_user', 'User not authenticated.', [ 'status' => 401 ] );
+	}
 
-    $token = bin2hex(random_bytes(24));
-    set_transient('owpd_login_' . $token, $user_id, 30);
+	$token = wp_generate_password( 48, false, false );
+	set_transient( 'owpd_login_' . hash( 'sha256', $token ), $user_id, 60 );
 
-    $login_url = add_query_arg([
-        'owpd_autologin' => $token,
-    ], wp_login_url());
+	$login_url = add_query_arg( [
+		'owpd_autologin' => $token,
+	], admin_url() );
 
-    return rest_ensure_response([
-        'login_url'  => $login_url,
-        'expires_in' => 30,
-    ]);
+	return rest_ensure_response( [
+		'login_url'  => $login_url,
+		'expires_in' => 60,
+	] );
 }
 
-add_action('login_init', function () {
-    if (empty($_GET['owpd_autologin'])) {
-        return;
-    }
+/**
+ * Verarbeitet den Einmal-Login-Token beim Aufruf von wp-admin.
+ */
+add_action( 'init', function () {
+	if ( empty( $_GET['owpd_autologin'] ) ) {
+		return;
+	}
 
-    $token = sanitize_text_field(wp_unslash($_GET['owpd_autologin']));
-    if (!preg_match('/^[a-f0-9]{48}$/', $token)) {
-        wp_die(esc_html__('Invalid login token.', 'owpd-companion'), "Olpo's WordPressDock", ['response' => 403]);
-    }
+	$token   = sanitize_text_field( wp_unslash( $_GET['owpd_autologin'] ) );
+	$key     = 'owpd_login_' . hash( 'sha256', $token );
+	$user_id = get_transient( $key );
 
-    $transient_key = 'owpd_login_' . $token;
-    $user_id       = get_transient($transient_key);
+	if ( ! $user_id ) {
+		wp_die( 'OWPD Login-Token ist ungültig oder abgelaufen.', 'OWPD Login', [ 'response' => 403 ] );
+	}
 
-    delete_transient($transient_key);
+	delete_transient( $key );
 
-    if (!$user_id) {
-        wp_die(esc_html__('Login token expired or already used.', 'owpd-companion'), "Olpo's WordPressDock", ['response' => 403]);
-    }
+	wp_clear_auth_cookie();
+	wp_set_current_user( (int) $user_id );
+	wp_set_auth_cookie( (int) $user_id, true );
 
-    $user = get_user_by('id', (int) $user_id);
-    if (!$user || !user_can($user, 'manage_options')) {
-        wp_die(esc_html__('Permission denied.', 'owpd-companion'), "Olpo's WordPressDock", ['response' => 403]);
-    }
-
-    wp_clear_auth_cookie();
-    wp_set_current_user($user->ID);
-    wp_set_auth_cookie($user->ID, true);
-    do_action('wp_login', $user->user_login, $user);
-
-    wp_safe_redirect(admin_url());
-    exit;
-});
+	wp_safe_redirect( admin_url() );
+	exit;
+}, 1 );
