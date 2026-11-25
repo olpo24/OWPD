@@ -1,9 +1,10 @@
 document.addEventListener('DOMContentLoaded', async () => {
-  const listEl = document.getElementById('sp-site-list');
+  const listEl = document.getElementById('sp-sites-list');
   const refreshBtn = document.getElementById('sp-refresh-btn');
   const openDashBtn = document.getElementById('sp-open-dashboard');
   const themeToggleBtn = document.getElementById('sp-theme-toggle');
-  const contextBox = document.getElementById('sp-active-context');
+  const searchInput = document.getElementById('sp-search');
+  const contextBox = document.getElementById('sp-active-tab-box');
 
   const THEME_CYCLE = ['system', 'light', 'dark'];
   const THEME_ICONS = { system: '◐', light: '☀', dark: '☾' };
@@ -36,6 +37,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     await chrome.runtime.sendMessage({ type: 'CHECK_ALL_SITES' });
     refreshBtn.disabled = false;
   });
+
+  searchInput.addEventListener('input', renderSidePanel);
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local') {
@@ -95,6 +98,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function renderSidePanel() {
     const { sites = [] } = await chrome.storage.local.get('sites');
+    const query = searchInput.value.trim().toLowerCase();
 
     if (sites.length === 0) {
       listEl.innerHTML = `
@@ -109,7 +113,21 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    listEl.innerHTML = sites
+    const filtered = sites.filter((s) => {
+      if (!query) return true;
+      return (
+        s.name.toLowerCase().includes(query) ||
+        s.url.toLowerCase().includes(query) ||
+        (s.category || '').toLowerCase().includes(query)
+      );
+    });
+
+    if (filtered.length === 0) {
+      listEl.innerHTML = `<div class="owpd-empty">${escapeHtml(t('noMatchingSites'))}</div>`;
+      return;
+    }
+
+    listEl.innerHTML = filtered
       .map((site) => {
         const cleanUrl = site.url.replace(/\/$/, '');
         const totalUpdates =
