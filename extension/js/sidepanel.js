@@ -40,10 +40,41 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   searchInput.addEventListener('input', renderSidePanel);
 
+  // Zentraler Delegated-Click-Handler für 1-Klick-Login & Details (aktive Tab-Box + Kacheln)
+  document.body.addEventListener('click', async (e) => {
+    const loginBtn = e.target.closest('[data-action="autologin"]');
+    if (loginBtn) {
+      const originalText = loginBtn.textContent;
+      loginBtn.disabled = true;
+      loginBtn.textContent = t('tokenLoading');
+
+      const res = await chrome.runtime.sendMessage({
+        type: 'ONE_CLICK_LOGIN',
+        siteId: loginBtn.dataset.siteId
+      });
+
+      loginBtn.disabled = false;
+      loginBtn.textContent = originalText;
+
+      if (!res || !res.ok) {
+        alert(t('loginFailed', [res?.error || 'Error']));
+      }
+      return;
+    }
+
+    const detailsBtn = e.target.closest('[data-open-details]');
+    if (detailsBtn) {
+      chrome.runtime.sendMessage({ type: 'OPEN_DASHBOARD', siteId: detailsBtn.dataset.openDetails });
+    }
+  });
+
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local') {
       if (changes.themeMode) syncThemeButton();
-      if (changes.sites) renderSidePanel();
+      if (changes.sites) {
+        renderSidePanel();
+        renderActiveContext();
+      }
     }
   });
 
@@ -72,23 +103,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const cleanUrl = matched.url.replace(/\/$/, '');
       const isWpAdmin = activeTab.url.includes('/wp-admin');
+      const hasAutoLogin = Boolean(matched.username && matched.appPassword);
 
       contextBox.hidden = false;
       contextBox.innerHTML = `
-        <div class="sp-context__label">${escapeHtml(t('activeTabDetected'))}</div>
-        <div class="sp-context__title">${escapeHtml(matched.name)}</div>
-        <div class="sp-context__actions">
-          ${
-            isWpAdmin
-              ? `<a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/" target="_blank">${escapeHtml(t('frontend'))}</a>`
-              : `<a class="owpd-btn owpd-btn--primary owpd-btn--sm" href="${cleanUrl}/wp-admin/" target="_blank">WP-Admin</a>`
-          }
-          <a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/wp-admin/plugins.php" target="_blank">${escapeHtml(t('plugins'))}</a>
-          ${
-            matched.bricksActive
-              ? `<a class="owpd-btn owpd-btn--sm" href="${activeTab.url.split('?')[0]}?bricks=run" target="_blank">Bricks</a>`
-              : ''
-          }
+        <div class="sp-context">
+          <div class="sp-context__label">${escapeHtml(t('activeTabDetected'))}</div>
+          <div class="sp-context__title">${escapeHtml(matched.name)}</div>
+          <div class="sp-context__actions">
+            ${
+              isWpAdmin
+                ? `<a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/" target="_blank">${escapeHtml(t('frontend'))}</a>`
+                : hasAutoLogin
+                ? `<button type="button" class="owpd-btn owpd-btn--success owpd-btn--sm" data-action="autologin" data-site-id="${matched.id}">${escapeHtml(t('oneClickLogin'))}</button>`
+                : `<a class="owpd-btn owpd-btn--primary owpd-btn--sm" href="${cleanUrl}/wp-admin/" target="_blank">WP-Admin</a>`
+            }
+            <a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/wp-admin/plugins.php" target="_blank">${escapeHtml(t('plugins'))}</a>
+            ${
+              matched.bricksActive
+                ? `<a class="owpd-btn owpd-btn--sm" href="${activeTab.url.split('?')[0]}?bricks=run" target="_blank">Bricks</a>`
+                : ''
+            }
+          </div>
         </div>
       `;
     } catch (e) {
@@ -130,6 +166,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     listEl.innerHTML = filtered
       .map((site) => {
         const cleanUrl = site.url.replace(/\/$/, '');
+        const hasAutoLogin = Boolean(site.username && site.appPassword);
         const totalUpdates =
           (site.pluginsCount || 0) +
           (site.themesCount || 0) +
@@ -173,7 +210,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>
 
             <div class="sp-card__actions">
-              <a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/wp-admin/" target="_blank">WP-Admin</a>
+              ${
+                hasAutoLogin
+                  ? `<button type="button" class="owpd-btn owpd-btn--success owpd-btn--sm" data-action="autologin" data-site-id="${site.id}">${escapeHtml(t('oneClickLogin'))}</button>`
+                  : `<a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/wp-admin/" target="_blank">WP-Admin</a>`
+              }
               <a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/wp-admin/update-core.php" target="_blank">${escapeHtml(t('updates'))}</a>
               <button class="owpd-btn owpd-btn--sm" data-open-details="${site.id}">${escapeHtml(t('details'))}</button>
             </div>
@@ -181,12 +222,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         `;
       })
       .join('');
-
-    listEl.querySelectorAll('[data-open-details]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        chrome.runtime.sendMessage({ type: 'OPEN_DASHBOARD', siteId: btn.dataset.openDetails });
-      });
-    });
   }
 });
 
