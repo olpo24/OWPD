@@ -34,7 +34,14 @@ jobs:
           full_ver = tag.lstrip("v")
           base_part = full_ver.split("-")[0]
           parts = (base_part.split(".") + ["0", "0", "0"])[:3]
-          manifest_ver = ".".join(parts)
+          major, minor, patch = int(parts[0]), int(parts[1]), int(parts[2])
+
+          # Solange Release <= 1.1.0 ist, für Store-APIs über 1.1.0 bleiben (version_name bleibt 0.x-beta)
+          if (major, minor, patch) <= (1, 1, 0):
+              manifest_ver = f"1.1.{max(1, patch)}"
+          else:
+              manifest_ver = f"{major}.{minor}.{patch}"
+
           today = date.today().isoformat()
           is_prerelease = "-" in full_ver
 
