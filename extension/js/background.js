@@ -1,7 +1,7 @@
 /**
  * OWPD - Olpo's WordPressDock
  * Description: Lightweight multi-site dashboard and companion for WordPress.
- * Version: 0.5.5-beta
+ * Version: 0.5.7-beta
  * Author: Ole Poetter
  * Author URI: https://olpo.de
  */

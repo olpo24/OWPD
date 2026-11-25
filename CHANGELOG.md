@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.5.7-beta] - 2026-11-25
+
+- Improved: Refactor release workflow for clarity and updates
+
 ## [0.5.5-beta] - 2026-11-25
 
 - Added: environment variables for client IDs in release.yml
