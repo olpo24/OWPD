@@ -77,6 +77,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === 'ONE_CLICK_LOGIN') {
+    executeOneClickLogin(message.siteId)
+      .then((res) => sendResponse(res))
+      .catch((err) => sendResponse({ ok: false, error: err.message }));
+    return true;
+  }
+
   if (message.type === 'SEND_TEST_NOTIFICATION') {
     const notifId = `owpd-test-${Date.now()}`;
     chrome.notifications.create(notifId, {
@@ -90,6 +97,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 });
+
+async function executeOneClickLogin(siteId) {
+  const { sites = [] } = await chrome.storage.local.get('sites');
+  const site = sites.find((s) => s.id === siteId);
+  if (!site || !site.username || !site.appPassword) {
+    return { ok: false, error: 'Missing credentials' };
+  }
+
+  const cleanUrl = site.url.replace(/\/$/, '');
+  const token = btoa(`${site.username}:${site.appPassword}`);
+
+  const res = await fetch(`${cleanUrl}/wp-json/owpd/v1/login-token`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${token}`,
+      'X-OWPD-Authorization': `Basic ${token}`,
+      Accept: 'application/json'
+    }
+  });
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+
+  const data = await res.json();
+  if (data.login_url) {
+    await chrome.tabs.create({ url: data.login_url });
+    return { ok: true };
+  }
+
+  throw new Error('No login URL returned');
+}
 
 async function openOrFocusDashboard(siteId) {
   const baseUrl = chrome.runtime.getURL('views/dashboard.html');
