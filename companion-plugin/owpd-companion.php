@@ -30,7 +30,7 @@ function owpd_determine_current_user( $user_id ) {
 	}
 
 	$request_uri = $_SERVER['REQUEST_URI'] ?? '';
-	if ( strpos( $request_uri, '/wp-json/owpd/v1/' ) === false ) {
+	if ( strpos( $request_uri, 'owpd/v1' ) === false && strpos( $request_uri, 'owpd%2Fv1' ) === false ) {
 		return $user_id;
 	}
 
