@@ -67,7 +67,6 @@ jobs:
           if not (added or improved or fixed):
               improved.append(f"Release {full_ver}")
 
-          # 1. changelog.json aktualisieren
           json_path = pathlib.Path("changelog.json")
           entries = json.loads(json_path.read_text(encoding="utf-8")) if json_path.exists() else []
           entries = [e for e in entries if e.get("version") != full_ver]
@@ -83,7 +82,6 @@ jobs:
           })
           json_path.write_text(json.dumps(entries, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
-          # 2. CHANGELOG.md aktualisieren
           md_lines = [f"## [{full_ver}] - {today}", ""]
           for item in added:
               md_lines.append(f"- Added: {item}")
@@ -100,7 +98,6 @@ jobs:
           header, rest = old_md.split("\n\n", 1) if "\n\n" in old_md else ("# Changelog", "")
           md_path.write_text(f"{header}\n\n{release_notes}\n\n{rest}".strip() + "\n", encoding="utf-8")
 
-          # 3. Versionen in PHP, JS, CSS, HTML, messages.json & manifest.json aktualisieren
           for ext in ("*.php", "*.js", "*.css", "*.html"):
               for path in pathlib.Path(".").rglob(ext):
                   content = path.read_text(encoding="utf-8")
@@ -158,21 +155,22 @@ jobs:
           files: dist/*.zip
 
       - name: Publish to Microsoft Edge Add-ons Store (Draft)
-    if: env.EDGE_CLIENT_ID != ''
-    uses: wdzeng/edge-addon@v2
-    with:
-      product-id: ${{ secrets.EDGE_PRODUCT_ID }}
-      client-id: ${{ secrets.EDGE_CLIENT_ID }}
-      api-key: ${{ secrets.EDGE_API_KEY }}
-      zip-path: dist/owpd-extension-${{ steps.meta.outputs.full_version }}.zip
-      upload-only: true
-      notes-for-certification: ${{ steps.meta.outputs.full_version }} – siehe CHANGELOG.md
+        if: env.EDGE_CLIENT_ID != ''
+        uses: wdzeng/edge-addon@v2
+        with:
+          product-id: ${{ secrets.EDGE_PRODUCT_ID }}
+          client-id: ${{ secrets.EDGE_CLIENT_ID }}
+          api-key: ${{ secrets.EDGE_API_KEY }}
+          zip-path: "dist/owpd-extension-${{ steps.meta.outputs.full_version }}.zip"
+          upload-only: true
+          notes-for-certification: "OWPD ${{ steps.meta.outputs.full_version }} - see CHANGELOG.md"
+
       - name: Publish to Chrome Web Store (Draft)
-    if: env.CHROME_CLIENT_ID != ''
-    uses: cardinalby/webext-buildtools-chrome-webstore-upload-action@v1
-    with:
-      extensionId: ${{ secrets.CHROME_EXTENSION_ID }}
-      apiClientId: ${{ secrets.CHROME_CLIENT_ID }}
-      apiClientSecret: ${{ secrets.CHROME_CLIENT_SECRET }}
-      apiRefreshToken: ${{ secrets.CHROME_REFRESH_TOKEN }}
-      zipFilePath: dist/owpd-extension-${{ steps.meta.outputs.full_version }}.zip
+        if: env.CHROME_CLIENT_ID != ''
+        uses: cardinalby/webext-buildtools-chrome-webstore-upload-action@v1
+        with:
+          extensionId: ${{ secrets.CHROME_EXTENSION_ID }}
+          apiClientId: ${{ secrets.CHROME_CLIENT_ID }}
+          apiClientSecret: ${{ secrets.CHROME_CLIENT_SECRET }}
+          apiRefreshToken: ${{ secrets.CHROME_REFRESH_TOKEN }}
+          zipFilePath: "dist/owpd-extension-${{ steps.meta.outputs.full_version }}.zip"
