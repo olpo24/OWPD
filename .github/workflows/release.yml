@@ -157,22 +157,22 @@ jobs:
           prerelease: ${{ contains(steps.meta.outputs.full_version, '-') }}
           files: dist/*.zip
 
-      - name: Publish to Microsoft Edge Add-ons Store (with Changelog notes)
-        if: env.EDGE_CLIENT_ID != ''
-        uses: wdzeng/edge-addon@v2
-        with:
-          product-id: ${{ secrets.EDGE_PRODUCT_ID }}
-          client-id: ${{ secrets.EDGE_CLIENT_ID }}
-          api-key: ${{ secrets.EDGE_API_KEY }}
-          zip-path: dist/owpd-extension-${{ steps.meta.outputs.full_version }}.zip
-          notes: ${{ steps.meta.outputs.full_version }} – siehe CHANGELOG.md
-
-      - name: Publish to Chrome Web Store
-        if: env.CHROME_CLIENT_ID != ''
-        uses: mnao305/chrome-extension-upload@v5.0.0
-        with:
-          file-path: dist/owpd-extension-${{ steps.meta.outputs.full_version }}.zip
-          extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
-          client-id: ${{ secrets.CHROME_CLIENT_ID }}
-          client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
-          refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
+      - name: Publish to Microsoft Edge Add-ons Store (Draft)
+    if: env.EDGE_CLIENT_ID != ''
+    uses: wdzeng/edge-addon@v2
+    with:
+      product-id: ${{ secrets.EDGE_PRODUCT_ID }}
+      client-id: ${{ secrets.EDGE_CLIENT_ID }}
+      api-key: ${{ secrets.EDGE_API_KEY }}
+      zip-path: dist/owpd-extension-${{ steps.meta.outputs.full_version }}.zip
+      upload-only: true
+      notes-for-certification: ${{ steps.meta.outputs.full_version }} – siehe CHANGELOG.md
+      - name: Publish to Chrome Web Store (Draft)
+    if: env.CHROME_CLIENT_ID != ''
+    uses: cardinalby/webext-buildtools-chrome-webstore-upload-action@v1
+    with:
+      extensionId: ${{ secrets.CHROME_EXTENSION_ID }}
+      apiClientId: ${{ secrets.CHROME_CLIENT_ID }}
+      apiClientSecret: ${{ secrets.CHROME_CLIENT_SECRET }}
+      apiRefreshToken: ${{ secrets.CHROME_REFRESH_TOKEN }}
+      zipFilePath: dist/owpd-extension-${{ steps.meta.outputs.full_version }}.zip
