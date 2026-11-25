@@ -1,4 +1,8 @@
 {
+  "_meta": {
+    "message": "OWPD - Olpo's WordPressDock | Version: 0.5-beta | Author: Ole Poetter (https://olpo.de)"
+  },
+{
   "extName": { "message": "Olpo's WordPressDock" },
   "extDescription": { "message": "Manage your Wordpress installations in the browser." },
   "actionTitle": { "message": "Open Olpo's WordPressDock" },
