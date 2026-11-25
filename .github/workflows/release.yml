@@ -113,7 +113,9 @@ jobs:
           locales_dir = pathlib.Path("extension/_locales")
           if locales_dir.exists():
               for msg_path in locales_dir.rglob("messages.json"):
-                  data = json.loads(msg_path.read_text(encoding="utf-8"))
+                  raw_text = msg_path.read_text(encoding="utf-8")
+                  clean_text = re.sub(r"^\s*/\*[\s\S]*?\*/\s*", "", raw_text)
+                  data = json.loads(clean_text)
                   if "_meta" in data and isinstance(data["_meta"], dict):
                       data["_meta"]["message"] = re.sub(r"(Version:\s*)[^|\"\x27]+", rf"\g<1>{full_ver} ", data["_meta"]["message"]).strip()
                       msg_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
