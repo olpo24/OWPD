@@ -1,0 +1,172 @@
+name: Release, Changelog & Store Deploy
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract versions & generate Changelog
+        id: meta
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 - <<'EOF'
+          import os, re, json, subprocess, pathlib
+          from datetime import date
+
+          tag = os.environ["GITHUB_REF_NAME"]
+          full_ver = tag.lstrip("v")
+          base_part = full_ver.split("-")[0]
+          parts = (base_part.split(".") + ["0", "0", "0"])[:3]
+          manifest_ver = ".".join(parts)
+          today = date.today().isoformat()
+          is_prerelease = "-" in full_ver
+
+          # Vorherigen Tag ermitteln
+          prev_tag_proc = subprocess.run(
+              ["git", "describe", "--tags", "--abbrev=0", f"{tag}^"],
+              capture_output=True, text=True
+          )
+          prev_tag = prev_tag_proc.stdout.strip()
+          log_range = f"{prev_tag}..{tag}" if prev_tag else tag
+
+          commits_proc = subprocess.run(
+              ["git", "log", log_range, "--pretty=format:%s"],
+              capture_output=True, text=True
+          )
+          lines = [l.strip() for l in commits_proc.stdout.splitlines() if l.strip()]
+
+          added, improved, fixed = [], [], []
+          for line in lines:
+              if line.startswith("chore(release):"):
+                  continue
+              if re.match(r"^(Added|Add|feat)(\(.*?\))?:\s*", line, re.I):
+                  added.append(re.sub(r"^(Added|Add|feat)(\(.*?\))?:\s*", "", line, flags=re.I))
+              elif re.match(r"^(Fixed|Fix)(\(.*?\))?:\s*", line, re.I):
+                  fixed.append(re.sub(r"^(Fixed|Fix)(\(.*?\))?:\s*", "", line, flags=re.I))
+              elif re.match(r"^(Improved|Improve|Update|Refactor|perf)(\(.*?\))?:\s*", line, re.I):
+                  improved.append(re.sub(r"^(Improved|Improve|Update|Refactor|perf)(\(.*?\))?:\s*", "", line, flags=re.I))
+              else:
+                  improved.append(line)
+
+          if not (added or improved or fixed):
+              improved.append(f"Release {full_ver}")
+
+          # 1. changelog.json aktualisieren (für olpo.de)
+          json_path = pathlib.Path("changelog.json")
+          entries = json.loads(json_path.read_text(encoding="utf-8")) if json_path.exists() else []
+          entries = [e for e in entries if e.get("version") != full_ver]
+          entries.insert(0, {
+              "version": full_ver,
+              "date": today,
+              "prerelease": is_prerelease,
+              "changes": {
+                  "added": added,
+                  "improved": improved,
+                  "fixed": fixed
+              }
+          })
+          json_path.write_text(json.dumps(entries, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+          # 2. Markdown-Block für CHANGELOG.md, GitHub Release & Edge Store bauen
+          md_lines = [f"## [{full_ver}] - {today}", ""]
+          for item in added:
+              md_lines.append(f"- Added: {item}")
+          for item in improved:
+              md_lines.append(f"- Improved: {item}")
+          for item in fixed:
+              md_lines.append(f"- Fixed: {item}")
+          release_notes = "\n".join(md_lines)
+
+          md_path = pathlib.Path("CHANGELOG.md")
+          old_md = md_path.read_text(encoding="utf-8") if md_path.exists() else "# Changelog\n\n"
+          if not old_md.startswith("# Changelog"):
+              old_md = "# Changelog\n\n" + old_md
+          header, rest = old_md.split("\n\n", 1)
+          md_path.write_text(f"{header}\n\n{release_notes}\n\n{rest}".strip() + "\n", encoding="utf-8")
+
+          # 3. Versionen in PHP, JS, CSS, HTML, messages.json & manifest.json aktualisieren
+          for ext in ("*.php", "*.js", "*.css", "*.html"):
+              for path in pathlib.Path(".").rglob(ext):
+                  content = path.read_text(encoding="utf-8")
+                  updated = re.sub(r"(^\s*\*\s*Version:\s*).*$", rf"\g<1>{full_ver}", content, flags=re.MULTILINE)
+                  if path.suffix == ".php":
+                      updated = re.sub(r"(define\(\s*'OWPD_VERSION'\s*,\s*')[^']+('\s*\)\s*;)", rf"\g<1>{full_ver}\g<2>", updated)
+                  if updated != content:
+                      path.write_text(updated, encoding="utf-8")
+
+          for msg_path in pathlib.Path("extension/_locales").rglob("messages.json"):
+              data = json.loads(msg_path.read_text(encoding="utf-8"))
+              if "_meta" in data and isinstance(data["_meta"], dict):
+                  data["_meta"]["message"] = re.sub(r"(Version:\s*)[^|\"']+", rf"\g<1>{full_ver} ", data["_meta"]["message"]).strip()
+                  msg_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+          manifest_path = pathlib.Path("extension/manifest.json")
+          if manifest_path.exists():
+              data = json.loads(manifest_path.read_text(encoding="utf-8"))
+              data["version"] = manifest_ver
+              data["version_name"] = full_ver
+              manifest_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+          pathlib.Path("/tmp/release_notes.md").write_text(release_notes, encoding="utf-8")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"full_version={full_ver}\n")
+              f.write(f"manifest_version={manifest_ver}\n")
+          EOF
+
+      - name: Commit bumped versions & changelogs back to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [[ -n $(git status -s) ]]; then
+            git add .
+            git commit -m "chore(release): bump version & changelog to ${{ steps.meta.outputs.full_version }}"
+            git push origin HEAD:main || true
+          fi
+
+      - name: Package Extension & Companion ZIPs
+        run: |
+          mkdir -p dist
+          (cd extension && zip -r "../dist/owpd-extension-${{ steps.meta.outputs.full_version }}.zip" .)
+          zip -r "dist/owpd-companion-${{ steps.meta.outputs.full_version }}.zip" companion-plugin/
+
+      - name: Create GitHub Release with Changelog & ZIPs
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "OWPD ${{ steps.meta.outputs.full_version }}"
+          body_path: /tmp/release_notes.md
+          prerelease: ${{ contains(steps.meta.outputs.full_version, '-') }}
+          files: dist/*.zip
+
+      - name: Publish to Microsoft Edge Add-ons Store (with Changelog notes)
+        if: ${{ secrets.EDGE_CLIENT_ID != '' }}
+        uses: wdzeng/edge-addon@v2
+        with:
+          product-id: ${{ secrets.EDGE_PRODUCT_ID }}
+          client-id: ${{ secrets.EDGE_CLIENT_ID }}
+          api-key: ${{ secrets.EDGE_API_KEY }}
+          zip-path: dist/owpd-extension-${{ steps.meta.outputs.full_version }}.zip
+          notes: ${{ steps.meta.outputs.full_version }} – siehe CHANGELOG.md
+
+      - name: Publish to Chrome Web Store
+        if: ${{ secrets.CHROME_CLIENT_ID != '' }}
+        uses: mnao305/chrome-extension-upload@v5.0.0
+        with:
+          file-path: dist/owpd-extension-${{ steps.meta.outputs.full_version }}.zip
+          extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
+          client-id: ${{ secrets.CHROME_CLIENT_ID }}
+          client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
+          refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
