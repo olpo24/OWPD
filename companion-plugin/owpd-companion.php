@@ -2,7 +2,7 @@
 /**
  * Plugin Name: OWPD Companion
  * Description: Lightweight REST API companion for Olpo's WordPressDock (OWPD) browser extension.
- * Version: 1.1.0
+ * Version: 0.5-beta
  * Author: Ole Poetter
  * Author URI: https://olpo.de
  */
