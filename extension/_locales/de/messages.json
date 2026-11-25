@@ -1,91 +1,316 @@
 {
   "_meta": {
-    "message": "OWPD - Olpo's WordPressDock | Version: 0.5-beta | Author: Ole Poetter (https://olpo.de)"
+    "message": "OWPD - Olpo's WordPressDock | Version: 0.5.5-beta | Author: Ole Poetter (https://olpo.de)"
   },
-  "extName": { "message": "Olpo's WordPressDock" },
-  "extDescription": { "message": "Verwalte dein Wordpress Installationen im Browser." },
-  "actionTitle": { "message": "Olpo's WordPressDock öffnen" },
-  "toggleTheme": { "message": "Theme wechseln" },
-  "refreshAll": { "message": "Alle prüfen" },
-  "openDashboard": { "message": "Dashboard ↗" },
-  "searchPlaceholder": { "message": "Installation suchen..." },
-  "dashboardSearchPlaceholder": { "message": "Nach Name, URL, Kategorie oder Notiz suchen..." },
-  "emptyDock": { "message": "Noch keine WordPress-Seiten im Dock." },
-  "createInDashboard": { "message": "Im Dashboard anlegen" },
-  "statusOnline": { "message": "Online" },
-  "statusAuthError": { "message": "Auth-Fehler" },
-  "statusOffline": { "message": "Offline" },
-  "statusUnchecked": { "message": "Ungeprüft" },
-  "updateSingle": { "message": "1 Update" },
-  "updatePlural": { "message": "$COUNT$ Updates", "placeholders": { "count": { "content": "$1" } } },
-  "upToDate": { "message": "Aktuell" },
-  "oneClickLogin": { "message": "1-Click Login" },
-  "loginShort": { "message": "Login" },
-  "adminShort": { "message": "Admin" },
-  "plugins": { "message": "Plugins" },
-  "updates": { "message": "Updates" },
-  "detailsArrow": { "message": "Details →" },
-  "detailsAndUpdates": { "message": "Details & Updates" },
-  "activeTabDetected": { "message": "Aktiver Tab erkannt" },
-  "bricksEditor": { "message": "Bricks Editor" },
-  "tokenLoading": { "message": "Token..." },
-  "loginFailed": { "message": "1-Click-Login fehlgeschlagen ($ERROR$). Prüfe OWPD Companion & Application Password.", "placeholders": { "error": { "content": "$1" } } },
-  "navAll": { "message": "Alle Installationen" },
-  "navUpdates": { "message": "Mit Updates" },
-  "navOffline": { "message": "Offline / Fehler" },
-  "exportJson": { "message": "JSON Exportieren" },
-  "importJson": { "message": "JSON Importieren" },
-  "checkAllNow": { "message": "↻ Alle jetzt prüfen" },
-  "checkingAll": { "message": "Prüfe alle..." },
-  "addNewSite": { "message": "+ Neue WordPress-Seite" },
-  "statTotal": { "message": "Installationen gesamt" },
-  "statOnline": { "message": "Online erreichbar" },
-  "statUpdates": { "message": "Ausstehende Updates" },
-  "noMatchingSites": { "message": "Keine passenden Installationen gefunden." },
-  "modalNewSite": { "message": "Neue WordPress-Installation" },
-  "modalClose": { "message": "✕ Schließen" },
-  "labelName": { "message": "Projekt- / Seitenname *" },
-  "placeholderName": { "message": "z. B. bricks-index.de" },
-  "labelCategory": { "message": "Kategorie / Tag" },
-  "placeholderCategory": { "message": "z. B. Eigenes Projekt, Kunde, Staging" },
-  "labelUrl": { "message": "WordPress-URL *" },
-  "labelUsername": { "message": "WP-Benutzername (für OWPD Companion)" },
-  "labelAppPassword": { "message": "WordPress Application Password" },
-  "labelNotes": { "message": "Notizen (Hoster, Besonderheiten, Aufgaben)" },
-  "placeholderNotes": { "message": "z. B. Netcup Webhosting, Bricks Builder + MetaBox" },
-  "deleteSite": { "message": "Installation löschen" },
-  "confirmDelete": { "message": "Diese WordPress-Installation wirklich entfernen?" },
-  "testStatusNow": { "message": "Status jetzt testen" },
-  "testingStatus": { "message": "Prüfe..." },
-  "save": { "message": "Speichern" },
-  "pendingUpdatesTitle": { "message": "Ausstehende Updates" },
-  "lastCheck": { "message": "Letzter Check: $DATE$", "placeholders": { "date": { "content": "$1" } } },
-  "allUpToDateMsg": { "message": "✓ Alle Plugins, Themes und Core sind auf dem neuesten Stand." },
-  "companionHint": { "message": "Hinweis: Hinterlege Benutzername + Application Password (und installiere owpd-companion.php auf der WP-Seite), um Live-Updates und 1-Click-Login freizuschalten." },
-  "importSuccess": { "message": "$COUNT$ Installationen importiert.", "placeholders": { "count": { "content": "$1" } } },
-  "importFailed": { "message": "Import fehlgeschlagen: $ERROR$", "placeholders": { "error": { "content": "$1" } } },
-  "invalidFormat": { "message": "Ungültiges JSON-Format" },
-  "navSettings": { "message": "Einstellungen" },
-  "settingsTitle": { "message": "Darstellung & Einstellungen" },
-  "settingsThemeMode": { "message": "Farbmodus" },
-  "theme_system": { "message": "System" },
-  "theme_light": { "message": "Hell" },
-  "theme_dark": { "message": "Dunkel" },
-  "settingsAccentColor": { "message": "Primäre Akzentfarbe" },
-  "accentOrange": { "message": "Signal Orange" },
-  "accentCobalt": { "message": "Electric Cobalt" },
-  "accentEmerald": { "message": "Emerald Terminal" },
-  "accentAmber": { "message": "Amber Volt" },
-  "accentViolet": { "message": "Hyper Violet" },
-  "accentCrimson": { "message": "Crimson Pulse" },
-  "settingsNotifications": { "message": "Desktop-Benachrichtigungen" },
-  "notifyOfflineLabel": { "message": "Benachrichtigen, wenn eine Seite offline geht" },
-  "notifyOfflineDesc": { "message": "Sendet eine Systemmeldung, sobald eine Seite nicht mehr erreichbar ist oder einen Fehler liefert." },
-  "notifyUpdatesLabel": { "message": "Bei neuen Updates benachrichtigen" },
-  "notifyUpdatesDesc": { "message": "Zeigt die Anzahl ausstehender Core-, Plugin- oder Theme-Updates an." },
-  "notifOfflineTitle": { "message": "OWPD Warnung: $SITE$ offline", "placeholders": { "site": { "content": "$1" } } },
-  "notifOfflineBody": { "message": "$URL$ ist aktuell nicht erreichbar. Klicken, um Details zu öffnen.", "placeholders": { "url": { "content": "$1" } } },
-  "notifUpdatesTitle": { "message": "OWPD Updates: $SITE$", "placeholders": { "site": { "content": "$1" } } },
-  "notifUpdatesBodySingle": { "message": "Für $SITE$ ist 1 neues Update verfügbar.", "placeholders": { "site": { "content": "$1" } } },
-  "notifUpdatesBodyPlural": { "message": "Für $SITE$ sind $COUNT$ Updates verfügbar.", "placeholders": { "site": { "content": "$1" }, "count": { "content": "$2" } } }
+  "extName": {
+    "message": "Olpo's WordPressDock"
+  },
+  "extDescription": {
+    "message": "Verwalte dein Wordpress Installationen im Browser."
+  },
+  "actionTitle": {
+    "message": "Olpo's WordPressDock öffnen"
+  },
+  "toggleTheme": {
+    "message": "Theme wechseln"
+  },
+  "refreshAll": {
+    "message": "Alle prüfen"
+  },
+  "openDashboard": {
+    "message": "Dashboard ↗"
+  },
+  "searchPlaceholder": {
+    "message": "Installation suchen..."
+  },
+  "dashboardSearchPlaceholder": {
+    "message": "Nach Name, URL, Kategorie oder Notiz suchen..."
+  },
+  "emptyDock": {
+    "message": "Noch keine WordPress-Seiten im Dock."
+  },
+  "createInDashboard": {
+    "message": "Im Dashboard anlegen"
+  },
+  "statusOnline": {
+    "message": "Online"
+  },
+  "statusAuthError": {
+    "message": "Auth-Fehler"
+  },
+  "statusOffline": {
+    "message": "Offline"
+  },
+  "statusUnchecked": {
+    "message": "Ungeprüft"
+  },
+  "updateSingle": {
+    "message": "1 Update"
+  },
+  "updatePlural": {
+    "message": "$COUNT$ Updates",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "upToDate": {
+    "message": "Aktuell"
+  },
+  "oneClickLogin": {
+    "message": "1-Click Login"
+  },
+  "loginShort": {
+    "message": "Login"
+  },
+  "adminShort": {
+    "message": "Admin"
+  },
+  "plugins": {
+    "message": "Plugins"
+  },
+  "updates": {
+    "message": "Updates"
+  },
+  "detailsArrow": {
+    "message": "Details →"
+  },
+  "detailsAndUpdates": {
+    "message": "Details & Updates"
+  },
+  "activeTabDetected": {
+    "message": "Aktiver Tab erkannt"
+  },
+  "bricksEditor": {
+    "message": "Bricks Editor"
+  },
+  "tokenLoading": {
+    "message": "Token..."
+  },
+  "loginFailed": {
+    "message": "1-Click-Login fehlgeschlagen ($ERROR$). Prüfe OWPD Companion & Application Password.",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "navAll": {
+    "message": "Alle Installationen"
+  },
+  "navUpdates": {
+    "message": "Mit Updates"
+  },
+  "navOffline": {
+    "message": "Offline / Fehler"
+  },
+  "exportJson": {
+    "message": "JSON Exportieren"
+  },
+  "importJson": {
+    "message": "JSON Importieren"
+  },
+  "checkAllNow": {
+    "message": "↻ Alle jetzt prüfen"
+  },
+  "checkingAll": {
+    "message": "Prüfe alle..."
+  },
+  "addNewSite": {
+    "message": "+ Neue WordPress-Seite"
+  },
+  "statTotal": {
+    "message": "Installationen gesamt"
+  },
+  "statOnline": {
+    "message": "Online erreichbar"
+  },
+  "statUpdates": {
+    "message": "Ausstehende Updates"
+  },
+  "noMatchingSites": {
+    "message": "Keine passenden Installationen gefunden."
+  },
+  "modalNewSite": {
+    "message": "Neue WordPress-Installation"
+  },
+  "modalClose": {
+    "message": "✕ Schließen"
+  },
+  "labelName": {
+    "message": "Projekt- / Seitenname *"
+  },
+  "placeholderName": {
+    "message": "z. B. bricks-index.de"
+  },
+  "labelCategory": {
+    "message": "Kategorie / Tag"
+  },
+  "placeholderCategory": {
+    "message": "z. B. Eigenes Projekt, Kunde, Staging"
+  },
+  "labelUrl": {
+    "message": "WordPress-URL *"
+  },
+  "labelUsername": {
+    "message": "WP-Benutzername (für OWPD Companion)"
+  },
+  "labelAppPassword": {
+    "message": "WordPress Application Password"
+  },
+  "labelNotes": {
+    "message": "Notizen (Hoster, Besonderheiten, Aufgaben)"
+  },
+  "placeholderNotes": {
+    "message": "z. B. Netcup Webhosting, Bricks Builder + MetaBox"
+  },
+  "deleteSite": {
+    "message": "Installation löschen"
+  },
+  "confirmDelete": {
+    "message": "Diese WordPress-Installation wirklich entfernen?"
+  },
+  "testStatusNow": {
+    "message": "Status jetzt testen"
+  },
+  "testingStatus": {
+    "message": "Prüfe..."
+  },
+  "save": {
+    "message": "Speichern"
+  },
+  "pendingUpdatesTitle": {
+    "message": "Ausstehende Updates"
+  },
+  "lastCheck": {
+    "message": "Letzter Check: $DATE$",
+    "placeholders": {
+      "date": {
+        "content": "$1"
+      }
+    }
+  },
+  "allUpToDateMsg": {
+    "message": "✓ Alle Plugins, Themes und Core sind auf dem neuesten Stand."
+  },
+  "companionHint": {
+    "message": "Hinweis: Hinterlege Benutzername + Application Password (und installiere owpd-companion.php auf der WP-Seite), um Live-Updates und 1-Click-Login freizuschalten."
+  },
+  "importSuccess": {
+    "message": "$COUNT$ Installationen importiert.",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "importFailed": {
+    "message": "Import fehlgeschlagen: $ERROR$",
+    "placeholders": {
+      "error": {
+        "content": "$1"
+      }
+    }
+  },
+  "invalidFormat": {
+    "message": "Ungültiges JSON-Format"
+  },
+  "navSettings": {
+    "message": "Einstellungen"
+  },
+  "settingsTitle": {
+    "message": "Darstellung & Einstellungen"
+  },
+  "settingsThemeMode": {
+    "message": "Farbmodus"
+  },
+  "theme_system": {
+    "message": "System"
+  },
+  "theme_light": {
+    "message": "Hell"
+  },
+  "theme_dark": {
+    "message": "Dunkel"
+  },
+  "settingsAccentColor": {
+    "message": "Primäre Akzentfarbe"
+  },
+  "accentOrange": {
+    "message": "Signal Orange"
+  },
+  "accentCobalt": {
+    "message": "Electric Cobalt"
+  },
+  "accentEmerald": {
+    "message": "Emerald Terminal"
+  },
+  "accentAmber": {
+    "message": "Amber Volt"
+  },
+  "accentViolet": {
+    "message": "Hyper Violet"
+  },
+  "accentCrimson": {
+    "message": "Crimson Pulse"
+  },
+  "settingsNotifications": {
+    "message": "Desktop-Benachrichtigungen"
+  },
+  "notifyOfflineLabel": {
+    "message": "Benachrichtigen, wenn eine Seite offline geht"
+  },
+  "notifyOfflineDesc": {
+    "message": "Sendet eine Systemmeldung, sobald eine Seite nicht mehr erreichbar ist oder einen Fehler liefert."
+  },
+  "notifyUpdatesLabel": {
+    "message": "Bei neuen Updates benachrichtigen"
+  },
+  "notifyUpdatesDesc": {
+    "message": "Zeigt die Anzahl ausstehender Core-, Plugin- oder Theme-Updates an."
+  },
+  "notifOfflineTitle": {
+    "message": "OWPD Warnung: $SITE$ offline",
+    "placeholders": {
+      "site": {
+        "content": "$1"
+      }
+    }
+  },
+  "notifOfflineBody": {
+    "message": "$URL$ ist aktuell nicht erreichbar. Klicken, um Details zu öffnen.",
+    "placeholders": {
+      "url": {
+        "content": "$1"
+      }
+    }
+  },
+  "notifUpdatesTitle": {
+    "message": "OWPD Updates: $SITE$",
+    "placeholders": {
+      "site": {
+        "content": "$1"
+      }
+    }
+  },
+  "notifUpdatesBodySingle": {
+    "message": "Für $SITE$ ist 1 neues Update verfügbar.",
+    "placeholders": {
+      "site": {
+        "content": "$1"
+      }
+    }
+  },
+  "notifUpdatesBodyPlural": {
+    "message": "Für $SITE$ sind $COUNT$ Updates verfügbar.",
+    "placeholders": {
+      "site": {
+        "content": "$1"
+      },
+      "count": {
+        "content": "$2"
+      }
+    }
+  }
 }

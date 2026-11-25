@@ -1,0 +1,97 @@
+# Changelog
+
+## [0.5.5-beta] - 2026-11-25
+
+- Added: environment variables for client IDs in release.yml
+- Added: GitHub Actions workflow for release process
+- Improved: Fix version format in manifest.json
+- Improved: Update release.yml
+- Improved: manifest.json for reelease process
+- Improved: Update messages.json
+- Improved: Update messages.json
+- Improved: Update sidepanel.html
+- Improved: Add plugin metadata to dashboard.html
+- Improved: Update owpd-companion.php
+- Improved: Add project metadata to style.css
+- Improved: Add project metadata to themes.js
+- Improved: Update sidepanel.js
+- Improved: Update i18n.js
+- Improved: Update dashboard.js
+- Improved: Add metadata comments to background.js
+- Improved: Implement one-click login feature
+- Improved: Update sidepanel.js
+- Improved: Fix element IDs and add search functionality
+- Improved: Update owpd-companion.php
+- Improved: Refine request URI check for API version
+- Improved: Enhance authentication handling and status tracking
+- Improved: Update owpd-companion.php
+- Improved: Rename refresh button ID in sidepanel.html
+- Improved: Refactor sidepanel.js for improved functionality
+- Improved: Refactor update calculations with getTotalUpdatesForSite
+- Improved: Add translations count to site update calculation
+- Improved: Refactor OWPD Companion plugin for improved API
+- Improved: Add test notification button and functionality
+- Improved: Add X-OWPD-Authorization header for API requests
+- Improved: Add X-OWPD-Authorization header for API requests
+- Improved: Add CORS headers for OWPD API
+- Improved: Update owpd-companion.php
+- Improved: Update extension description for clarity
+- Improved: Update messages.json
+- Improved: Change structure
+- Improved: Rename extension/dashboard.html to extension/views/dashboard.html
+- Improved: Rename sidepanel.html to extension/views/sidepanel.html
+- Improved: Rename sidepanel.js to js/sidepanel.js
+- Improved: Rename i18n.js to js/i18n.js
+- Improved: Rename dashboard.js to js/dashboard.js
+- Improved: Rename background.js to js/background.js
+- Improved: Rename style.css to css/style.css
+- Improved: Rename dashboard.html to extension/dashboard.html
+- Improved: Add notification messages for updates and offline alerts
+- Improved: Add German notification messages to messages.json
+- Improved: Add styles for notification toggle component
+- Improved: Implement notification settings toggles
+- Improved: Add desktop notification settings to dashboard
+- Improved: Improve notification management and site checks
+- Improved: Add notifications permission to manifest.json
+- Improved: Refactor badge update logic and ensure alarms
+- Improved: Add files via upload
+- Improved: Fix formatting in messages.json for accentCrimson
+- Improved: Update messages.json
+- Improved: Add new settings and theme options in German locale
+- Improved: Add new settings and theme options to messages.json
+- Improved: Fix formatting issue in dashboard.js
+- Improved: Enhance theme and accent color management
+- Improved: Refactor dashboard layout and update styles
+- Improved: Refactor theme handling and button synchronization
+- Improved: Refactor header structure and add logo SVG
+- Improved: Refactor CSS variables and styles for consistency
+- Improved: Add theme engine with accent management
+- Improved: Rename style,css to style.css
+- Improved: Rename background,js to background.js
+- Improved: Rename dashboard.hml to dashboard.html
+- Improved: Add icons and default icon settings to manifest
+- Improved: Add files via upload
+- Improved: Add German README for OWPD project
+- Improved: Add installation and security notes to README
+- Improved: Initialize README.md with project details
+- Improved: Update dashboard.js
+- Improved: Update dashboard.hml
+- Improved: Update text content and translations in sidepanel.js
+- Improved: Update language attribute and add i18n support
+- Improved: Implement i18n functions for language support
+- Improved: Create i18n.js
+- Improved: Update manifest.json for localization and versioning
+- Improved: Add German localization for WordPressDock
+- Improved: Add English localization messages for WordPressDock
+- Improved: Update plugin description and version number
+- Improved: Add dashboard.js for site management features
+- Improved: Add initial HTML structure for dashboard
+- Improved: Add side panel functionality with event listeners
+- Improved: Add initial sidepanel.html structure
+- Improved: Add base styles and theme variables in style.css
+- Improved: Add background script for site monitoring and dashboard
+- Improved: Add manifest.json for WordPressDock extension
+- Improved: Add OWPD Companion plugin with REST endpoints
+- Fixed: JSON structure in messages.json
+- Fixed: JSON structure in messages.json
+- Fixed: GitHub Actions workflow for release process
