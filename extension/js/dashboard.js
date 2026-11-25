@@ -1,5 +1,14 @@
 let currentFilter = 'all';
 
+function getTotalUpdatesForSite(site) {
+  return (
+    (site.pluginsCount || 0) +
+    (site.themesCount || 0) +
+    (site.translationsCount || 0) +
+    (site.coreUpdate ? 1 : 0)
+  );
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const sitesView = document.getElementById('db-sites-view');
   const settingsView = document.getElementById('db-settings-view');
@@ -62,7 +71,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   await syncThemeControls();
   await syncNotificationControls();
 
-  // Zyklischer Quick-Toggle oben in der Sidebar
   themeToggleBtn.addEventListener('click', async () => {
     const { themeMode = 'system', accentColor = 'carbon-orange' } = await chrome.storage.local.get([
       'themeMode',
@@ -74,7 +82,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     await syncThemeControls();
   });
 
-  // Settings: 3-Wege Theme-Auswahl
   document.getElementById('settings-theme-group').addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-theme-choice]');
     if (!btn) return;
@@ -85,7 +92,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     await syncThemeControls();
   });
 
-  // Settings: Akzentfarben-Auswahl
   document.getElementById('settings-accent-grid').addEventListener('click', async (e) => {
     const btn = e.target.closest('[data-accent-choice]');
     if (!btn) return;
@@ -96,7 +102,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     await syncThemeControls();
   });
 
-  // Settings: Desktop-Benachrichtigungen
   notifyOfflineToggle?.addEventListener('change', async (e) => {
     await chrome.storage.local.set({ notifyOffline: e.target.checked });
   });
@@ -118,7 +123,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 1800);
   });
 
-  // Sidebar-Navigation (Sites vs. Settings)
   document.getElementById('db-category-nav').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-filter]');
     if (!btn) return;
@@ -274,10 +278,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const query = searchInput.value.trim().toLowerCase();
 
     const onlineCount = sites.filter((s) => s.status === 'online').length;
-    const totalUpdates = sites.reduce(
-      (sum, s) => sum + (s.pluginsCount || 0) + (s.themesCount || 0) + (s.coreUpdate ? 1 : 0),
-      0
-    );
+    const totalUpdates = sites.reduce((sum, s) => sum + getTotalUpdatesForSite(s), 0);
 
     statsEl.innerHTML = `
       <div class="db-stat-card">
@@ -295,7 +296,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     `;
 
     const filtered = sites.filter((s) => {
-      const updates = (s.pluginsCount || 0) + (s.themesCount || 0) + (s.coreUpdate ? 1 : 0);
+      const updates = getTotalUpdatesForSite(s);
       if (currentFilter === 'updates' && updates === 0) return false;
       if (currentFilter === 'offline' && s.status === 'online') return false;
 
@@ -316,7 +317,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     gridEl.innerHTML = filtered
       .map((site) => {
         const cleanUrl = site.url.replace(/\/$/, '');
-        const updates = (site.pluginsCount || 0) + (site.themesCount || 0) + (site.coreUpdate ? 1 : 0);
+        const updates = getTotalUpdatesForSite(site);
         const statusLabel =
           site.status === 'online'
             ? t('statusOnline')
@@ -398,17 +399,26 @@ document.addEventListener('DOMContentLoaded', async () => {
       const dateLocale = uiLang.startsWith('de') ? 'de-DE' : 'en-US';
       const formattedDate = site.lastChecked ? new Date(site.lastChecked).toLocaleString(dateLocale) : '–';
 
-      const pluginItems = (site.pluginsUpdates || [])
-        .map((p) => `<li><span>Plugin: <strong>${escapeHtml(p.name)}</strong></span><span>${escapeHtml(p.version)} → <strong>${escapeHtml(p.new_version)}</strong></span></li>`)
-        .join('');
-      const themeItems = (site.themesUpdates || [])
-        .map((tItem) => `<li><span>Theme: <strong>${escapeHtml(tItem.name)}</strong></span><span>${escapeHtml(tItem.version)} → <strong>${escapeHtml(tItem.new_version)}</strong></span></li>`)
-        .join('');
       const coreItem = site.coreUpdate
         ? `<li><span><strong>WordPress Core</strong></span><span>${escapeHtml(site.wpVersion)} → <strong>${escapeHtml(site.newWpVersion)}</strong></span></li>`
         : '';
 
-      const allItems = coreItem + pluginItems + themeItems;
+      const pluginItems = (site.pluginsUpdates || [])
+        .map((p) => `<li><span>Plugin: <strong>${escapeHtml(p.name)}</strong></span><span>${escapeHtml(p.version)} → <strong>${escapeHtml(p.new_version)}</strong></span></li>`)
+        .join('');
+
+      const themeItems = (site.themesUpdates || [])
+        .map((tItem) => `<li><span>Theme: <strong>${escapeHtml(tItem.name)}</strong></span><span>${escapeHtml(tItem.version)} → <strong>${escapeHtml(tItem.new_version)}</strong></span></li>`)
+        .join('');
+
+      const translationItems = (site.translationsUpdates || [])
+        .map((tr) => {
+          const targetName = tr.slug ? `${tr.slug} (${tr.type || 'plugin'})` : 'WordPress Core';
+          return `<li><span>Translation: <strong>${escapeHtml(targetName)}</strong> [${escapeHtml(tr.language)}]</span><span>→ <strong>${escapeHtml(tr.version || 'neu')}</strong></span></li>`;
+        })
+        .join('');
+
+      const allItems = coreItem + pluginItems + themeItems + translationItems;
 
       liveDetailsEl.innerHTML = `
         <div style="padding: 1.4rem; background: var(--bg-surface-alt); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
