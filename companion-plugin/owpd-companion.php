@@ -13,8 +13,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 define( 'OWPD_VERSION', '1.1.0' );
 
+$GLOBALS['owpd_authenticated_via_header'] = false;
+
 /**
- * Stellt sicher, dass Application Passwords verfügbar sind.
+ * Stellt sicher, dass Application Passwords aktiv bleiben.
  */
 add_filter( 'wp_is_application_passwords_available', '__return_true', 99 );
 
@@ -53,7 +55,6 @@ function owpd_determine_current_user( $user_id ) {
 	list( $username, $password ) = explode( ':', $decoded, 2 );
 	$password = preg_replace( '/\s+/', '', $password );
 
-	// Falls eine E-Mail-Adresse statt des Benutzernamens eingetragen wurde, in user_login auflösen
 	if ( is_email( $username ) ) {
 		$user_obj = get_user_by( 'email', $username );
 		if ( $user_obj instanceof WP_User ) {
@@ -66,12 +67,24 @@ function owpd_determine_current_user( $user_id ) {
 	add_filter( 'determine_current_user', 'owpd_determine_current_user', 5 );
 
 	if ( $user instanceof WP_User ) {
+		$GLOBALS['owpd_authenticated_via_header'] = true;
 		return $user->ID;
 	}
 
 	return $user_id;
 }
 add_filter( 'determine_current_user', 'owpd_determine_current_user', 5 );
+
+/**
+ * Verhindert, dass nachgelagerte Core- oder Security-Plugin-Filter einen
+ * bereits über X-OWPD-Authorization verifizierten Request nachträglich auf 401 setzen.
+ */
+add_filter( 'rest_authentication_errors', function ( $result ) {
+	if ( ! empty( $GLOBALS['owpd_authenticated_via_header'] ) ) {
+		return true;
+	}
+	return $result;
+}, 99 );
 
 /**
  * CORS-Header für Chrome/Edge Extension Requests freigeben.
