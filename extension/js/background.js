@@ -106,7 +106,12 @@ async function openOrFocusDashboard(siteId) {
 }
 
 function getSiteUpdateCount(site) {
-  return (site.pluginsCount || 0) + (site.themesCount || 0) + (site.coreUpdate ? 1 : 0);
+  return (
+    (site.pluginsCount || 0) +
+    (site.themesCount || 0) +
+    (site.translationsCount || 0) +
+    (site.coreUpdate ? 1 : 0)
+  );
 }
 
 function isSiteOfflineOrError(site) {
@@ -194,6 +199,8 @@ async function fetchSiteStatus(site) {
         pluginsUpdates: Array.isArray(data.plugins_updates) ? data.plugins_updates : [],
         themesCount: Number(data.themes_count || 0),
         themesUpdates: Array.isArray(data.themes_updates) ? data.themes_updates : [],
+        translationsCount: Number(data.translations_count || 0),
+        translationsUpdates: Array.isArray(data.translations_updates) ? data.translations_updates : [],
         bricksActive: Boolean(data.bricks_active),
         bricksVersion: data.bricks_version || '',
         lastChecked: Date.now()
