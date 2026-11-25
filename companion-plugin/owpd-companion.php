@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 define( 'OWPD_VERSION', '1.1.0' );
 
 /**
- * Stellt sicher, dass Application Passwords auf HTTPS-Seiten verfügbar sind.
+ * Stellt sicher, dass Application Passwords verfügbar sind.
  */
 add_filter( 'wp_is_application_passwords_available', '__return_true', 99 );
 
@@ -22,7 +22,7 @@ add_filter( 'wp_is_application_passwords_available', '__return_true', 99 );
  * Authentifizierung über X-OWPD-Authorization (Priorität 5, vor WP-Standard-Auth),
  * damit Webserver/Proxies (PHP-FPM/FastCGI/Nginx) den Header nicht verwerfen können.
  */
-add_filter( 'determine_current_user', function ( $user_id ) {
+function owpd_determine_current_user( $user_id ) {
 	if ( ! empty( $user_id ) ) {
 		return $user_id;
 	}
@@ -53,17 +53,25 @@ add_filter( 'determine_current_user', function ( $user_id ) {
 	list( $username, $password ) = explode( ':', $decoded, 2 );
 	$password = preg_replace( '/\s+/', '', $password );
 
-	// Temporär eigenen Filter pausieren, um Rekursion zu verhindern
-	remove_filter( 'determine_current_user', __FUNCTION__, 5 );
+	// Falls eine E-Mail-Adresse statt des Benutzernamens eingetragen wurde, in user_login auflösen
+	if ( is_email( $username ) ) {
+		$user_obj = get_user_by( 'email', $username );
+		if ( $user_obj instanceof WP_User ) {
+			$username = $user_obj->user_login;
+		}
+	}
+
+	remove_filter( 'determine_current_user', 'owpd_determine_current_user', 5 );
 	$user = wp_authenticate_application_password( null, $username, $password );
-	add_filter( 'determine_current_user', __FUNCTION__, 5 );
+	add_filter( 'determine_current_user', 'owpd_determine_current_user', 5 );
 
 	if ( $user instanceof WP_User ) {
 		return $user->ID;
 	}
 
 	return $user_id;
-}, 5 );
+}
+add_filter( 'determine_current_user', 'owpd_determine_current_user', 5 );
 
 /**
  * CORS-Header für Chrome/Edge Extension Requests freigeben.
@@ -102,7 +110,6 @@ function owpd_rest_get_status() {
 	require_once ABSPATH . 'wp-admin/includes/update.php';
 	require_once ABSPATH . 'wp-admin/includes/plugin.php';
 
-	wp_version_check();
 	wp_update_plugins();
 	wp_update_themes();
 
