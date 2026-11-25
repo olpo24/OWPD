@@ -13,78 +13,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 define( 'OWPD_VERSION', '1.1.0' );
 
-$GLOBALS['owpd_authenticated_via_header'] = false;
-
 /**
  * Stellt sicher, dass Application Passwords aktiv bleiben.
  */
 add_filter( 'wp_is_application_passwords_available', '__return_true', 99 );
-
-/**
- * Authentifizierung über X-OWPD-Authorization (Priorität 5, vor WP-Standard-Auth),
- * damit Webserver/Proxies (PHP-FPM/FastCGI/Nginx) den Header nicht verwerfen können.
- */
-function owpd_determine_current_user( $user_id ) {
-	if ( ! empty( $user_id ) ) {
-		return $user_id;
-	}
-
-	$request_uri = $_SERVER['REQUEST_URI'] ?? '';
-	if ( strpos( $request_uri, 'owpd/v1' ) === false && strpos( $request_uri, 'owpd%2Fv1' ) === false ) {
-		return $user_id;
-	}
-
-	$auth_header = '';
-	if ( ! empty( $_SERVER['HTTP_X_OWPD_AUTHORIZATION'] ) ) {
-		$auth_header = $_SERVER['HTTP_X_OWPD_AUTHORIZATION'];
-	} elseif ( ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
-		$auth_header = $_SERVER['HTTP_AUTHORIZATION'];
-	} elseif ( ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
-		$auth_header = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
-	}
-
-	if ( stripos( $auth_header, 'Basic ' ) !== 0 ) {
-		return $user_id;
-	}
-
-	$decoded = base64_decode( substr( $auth_header, 6 ), true );
-	if ( ! $decoded || strpos( $decoded, ':' ) === false ) {
-		return $user_id;
-	}
-
-	list( $username, $password ) = explode( ':', $decoded, 2 );
-	$password = preg_replace( '/\s+/', '', $password );
-
-	if ( is_email( $username ) ) {
-		$user_obj = get_user_by( 'email', $username );
-		if ( $user_obj instanceof WP_User ) {
-			$username = $user_obj->user_login;
-		}
-	}
-
-	remove_filter( 'determine_current_user', 'owpd_determine_current_user', 5 );
-	$user = wp_authenticate_application_password( null, $username, $password );
-	add_filter( 'determine_current_user', 'owpd_determine_current_user', 5 );
-
-	if ( $user instanceof WP_User ) {
-		$GLOBALS['owpd_authenticated_via_header'] = true;
-		return $user->ID;
-	}
-
-	return $user_id;
-}
-add_filter( 'determine_current_user', 'owpd_determine_current_user', 5 );
-
-/**
- * Verhindert, dass nachgelagerte Core- oder Security-Plugin-Filter einen
- * bereits über X-OWPD-Authorization verifizierten Request nachträglich auf 401 setzen.
- */
-add_filter( 'rest_authentication_errors', function ( $result ) {
-	if ( ! empty( $GLOBALS['owpd_authenticated_via_header'] ) ) {
-		return true;
-	}
-	return $result;
-}, 99 );
 
 /**
  * CORS-Header für Chrome/Edge Extension Requests freigeben.
@@ -96,23 +28,106 @@ add_filter( 'rest_allowed_cors_headers', function ( $allow_headers ) {
 } );
 
 /**
+ * Prüft und authentifiziert den Request direkt anhand der REST-Header.
+ * Funktioniert unabhängig von PHP-FPM, FastCGI, Nginx, Unterverzeichnissen oder Permalinks.
+ *
+ * @param WP_REST_Request $request
+ * @return true|WP_Error
+ */
+function owpd_rest_permission_check( WP_REST_Request $request ) {
+	// 1. Falls bereits über Cookie/Standard-Auth eingeloggt
+	if ( is_user_logged_in() && current_user_can( 'manage_options' ) ) {
+		return true;
+	}
+
+	// 2. Header aus WP_REST_Request oder $_SERVER auslesen
+	$auth_header = $request->get_header( 'x_owpd_authorization' );
+	if ( empty( $auth_header ) ) {
+		$auth_header = $request->get_header( 'authorization' );
+	}
+	if ( empty( $auth_header ) && ! empty( $_SERVER['HTTP_X_OWPD_AUTHORIZATION'] ) ) {
+		$auth_header = $_SERVER['HTTP_X_OWPD_AUTHORIZATION'];
+	}
+	if ( empty( $auth_header ) && ! empty( $_SERVER['HTTP_AUTHORIZATION'] ) ) {
+		$auth_header = $_SERVER['HTTP_AUTHORIZATION'];
+	}
+	if ( empty( $auth_header ) && ! empty( $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ) ) {
+		$auth_header = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+	}
+
+	if ( empty( $auth_header ) || stripos( $auth_header, 'Basic ' ) !== 0 ) {
+		return new WP_Error(
+			'owpd_missing_auth',
+			'Kein OWPD Authorization-Header empfangen.',
+			[ 'status' => 401 ]
+		);
+	}
+
+	$decoded = base64_decode( substr( $auth_header, 6 ), true );
+	if ( ! $decoded || strpos( $decoded, ':' ) === false ) {
+		return new WP_Error(
+			'owpd_invalid_header',
+			'Authorization-Header konnte nicht dekodiert werden.',
+			[ 'status' => 401 ]
+		);
+	}
+
+	list( $username, $password ) = explode( ':', $decoded, 2 );
+	$password = preg_replace( '/\s+/', '', $password );
+
+	// E-Mail-Adresse bei Bedarf in user_login auflösen
+	if ( is_email( $username ) ) {
+		$user_obj = get_user_by( 'email', $username );
+		if ( $user_obj instanceof WP_User ) {
+			$username = $user_obj->user_login;
+		}
+	}
+
+	$user = wp_authenticate_application_password( null, $username, $password );
+
+	if ( is_wp_error( $user ) ) {
+		return new WP_Error(
+			'owpd_auth_failed',
+			'Application Password ungültig: ' . $user->get_error_message(),
+			[ 'status' => 401 ]
+		);
+	}
+
+	if ( ! ( $user instanceof WP_User ) ) {
+		return new WP_Error(
+			'owpd_auth_failed',
+			'Benutzer konnte nicht authentifiziert werden.',
+			[ 'status' => 401 ]
+		);
+	}
+
+	wp_set_current_user( $user->ID );
+
+	if ( ! current_user_can( 'manage_options' ) ) {
+		return new WP_Error(
+			'owpd_no_capability',
+			'Der Benutzer besitzt keine Administrator-Rechte (manage_options).',
+			[ 'status' => 403 ]
+		);
+	}
+
+	return true;
+}
+
+/**
  * REST-API Endpunkte registrieren.
  */
 add_action( 'rest_api_init', function () {
 	register_rest_route( 'owpd/v1', '/status', [
 		'methods'             => 'GET',
 		'callback'            => 'owpd_rest_get_status',
-		'permission_callback' => function () {
-			return is_user_logged_in() && current_user_can( 'manage_options' );
-		},
+		'permission_callback' => 'owpd_rest_permission_check',
 	] );
 
 	register_rest_route( 'owpd/v1', '/login-token', [
 		'methods'             => 'POST',
 		'callback'            => 'owpd_rest_create_login_token',
-		'permission_callback' => function () {
-			return is_user_logged_in() && current_user_can( 'manage_options' );
-		},
+		'permission_callback' => 'owpd_rest_permission_check',
 	] );
 } );
 
