@@ -47,10 +47,6 @@
     return out;
   }
 
-  // ---------------------------------------------------------------------------
-  // Lizenz-Helper (Free = max. 3 Instanzen, alle bestehenden Features frei)
-  // ---------------------------------------------------------------------------
-
   function canAddSite(count) {
     return window.OWPDLicense ? window.OWPDLicense.canAddSite(count) : count < 3;
   }
@@ -63,6 +59,28 @@
     return window.OWPDLicense
       ? window.OWPDLicense.getState()
       : { valid: false, plan: 'free', plan_label: 'Free', max_sites: 3 };
+  }
+
+  function getSiteUpdateCount(site) {
+    return (
+      (site.pluginsCount || 0) +
+      (site.themesCount || 0) +
+      (site.translationsCount || 0) +
+      (site.coreUpdate ? 1 : 0)
+    );
+  }
+
+  function renderStatusBadge(site) {
+    if (site.status === 'online') {
+      return `<span class="owpd-badge owpd-badge--online"><span class="owpd-dot"></span>${escapeHtml(t('statusOnline', 'Online'))}</span>`;
+    }
+    if (site.status === 'auth_error') {
+      return `<span class="owpd-badge owpd-badge--auth_error"><span class="owpd-dot"></span>${escapeHtml(t('statusAuthError', 'Auth Error'))}</span>`;
+    }
+    if (site.status === 'offline' || site.status === 'error') {
+      return `<span class="owpd-badge owpd-badge--offline"><span class="owpd-dot"></span>${escapeHtml(t('statusOffline', 'Offline'))}</span>`;
+    }
+    return `<span class="owpd-badge owpd-badge--neutral"><span class="owpd-dot"></span>${escapeHtml(t('statusUnchecked', 'Unchecked'))}</span>`;
   }
 
   // ---------------------------------------------------------------------------
@@ -161,7 +179,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Aktiver Tab Box (#sp-active-tab-box) mit Limit-Prüfung (3 / 6 / 9999) & 1-Click Login
+  // Aktiver Tab Kontext (.sp-active-context)
   // ---------------------------------------------------------------------------
 
   async function renderActiveTabBox() {
@@ -185,21 +203,22 @@
 
       box.hidden = false;
       box.innerHTML = `
-        <div class="sp-context">
-          <div class="sp-context__label">${escapeHtml(t('activeTabDetected', 'Active tab detected'))}</div>
-          <div class="sp-context__title">${escapeHtml(matched.name)}</div>
-          <div class="sp-context__actions">
+        <div class="sp-active-context">
+          <div class="sp-active-context__label">${escapeHtml(t('activeTabDetected', 'Active tab detected'))}</div>
+          <div class="sp-active-context__title">${escapeHtml(matched.name)}</div>
+          <div class="sp-active-context__links">
             ${
               isWpAdmin
-                ? `<a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/" target="_blank">${escapeHtml(t('frontend', 'Frontend'))}</a>`
+                ? `<a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/" target="_blank" rel="noopener">Frontend ↗</a>`
                 : hasAutoLogin
                 ? `<button type="button" class="owpd-btn owpd-btn--success owpd-btn--sm" id="sp-context-autologin" data-site-id="${matched.id}">${escapeHtml(t('oneClickLogin', '1-Click Login'))}</button>`
-                : `<a class="owpd-btn owpd-btn--primary owpd-btn--sm" href="${cleanUrl}/wp-admin/" target="_blank">WP-Admin</a>`
+                : `<a class="owpd-btn owpd-btn--primary owpd-btn--sm" href="${cleanUrl}/wp-admin/" target="_blank" rel="noopener">WP-Admin</a>`
             }
-            <a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/wp-admin/plugins.php" target="_blank">${escapeHtml(t('plugins', 'Plugins'))}</a>
+            <a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/wp-admin/plugins.php" target="_blank" rel="noopener">${escapeHtml(t('plugins', 'Plugins'))}</a>
+            <a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/wp-admin/update-core.php" target="_blank" rel="noopener">${escapeHtml(t('updates', 'Updates'))}</a>
             ${
               matched.bricksActive
-                ? `<a class="owpd-btn owpd-btn--sm" href="${tab.url.split('?')[0]}?bricks=run" target="_blank">Bricks</a>`
+                ? `<a class="owpd-btn owpd-btn--sm" href="${tab.url.split('?')[0]}?bricks=run" target="_blank" rel="noopener">Bricks</a>`
                 : ''
             }
           </div>
@@ -236,10 +255,13 @@
 
     box.hidden = false;
     box.innerHTML = `
-      <div class="sp-active-tab-banner" style="padding:0.8rem 1rem;margin:0 1rem 0.8rem;border-radius:0.8rem;background:rgba(148,163,184,0.12);display:flex;justify-content:space-between;align-items:center;gap:0.8rem;">
-        <span style="font-size:1.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(origin.replace(/^https?:\/\//, ''))}</span>
-        <button type="button" id="sp-quick-add-btn" class="owpd-btn owpd-btn--sm ${allowed ? 'owpd-btn--primary' : 'is-locked'}">
-          ${allowed ? '+ Add' : `Limit (${state.sites.length}/${maxSites}) 🔒`}
+      <div class="sp-active-context" style="display:flex;justify-content:space-between;align-items:center;gap:0.8rem;">
+        <div style="min-width:0;">
+          <div class="sp-active-context__label">${escapeHtml(t('activeTabDetected', 'Active tab detected'))}</div>
+          <div class="sp-card__url" style="margin-top:0;">${escapeHtml(origin.replace(/^https?:\/\//, ''))}</div>
+        </div>
+        <button type="button" id="sp-quick-add-btn" class="owpd-btn owpd-btn--sm ${allowed ? 'owpd-btn--primary' : ''}">
+          ${allowed ? '+ Add' : `Limit (${state.sites.length}/${maxSites})`}
         </button>
       </div>
     `;
@@ -278,7 +300,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Site-Liste (#sp-sites-list)
+  // Site-Karten (.sp-card) im Carbon-Design
   // ---------------------------------------------------------------------------
 
   function renderSitesList() {
@@ -292,7 +314,17 @@
     });
 
     if (filtered.length === 0) {
-      list.innerHTML = `<div style="padding:2rem 1.2rem;text-align:center;opacity:0.7;font-size:1.3rem;">${escapeHtml(t('emptyDock', 'No WordPress sites in your dock yet.'))}</div>`;
+      list.innerHTML = `
+        <div class="owpd-empty">
+          <p style="margin:0 0 1rem;">${escapeHtml(t('emptyDock', 'No WordPress sites in your dock yet.'))}</p>
+          <button type="button" id="sp-empty-dash-btn" class="owpd-btn owpd-btn--primary owpd-btn--sm">
+            ${escapeHtml(t('createInDashboard', 'Add in Dashboard'))}
+          </button>
+        </div>
+      `;
+      document.getElementById('sp-empty-dash-btn')?.addEventListener('click', () => {
+        chrome.tabs.create({ url: chrome.runtime.getURL('views/dashboard.html') });
+      });
       return;
     }
 
@@ -300,26 +332,64 @@
       .map((site) => {
         const cleanUrl = site.url.replace(/\/$/, '');
         const hasAutoLogin = Boolean(site.username && site.appPassword);
+        const updatesTotal = getSiteUpdateCount(site);
+
+        const updateBadge =
+          updatesTotal > 0
+            ? `<span class="owpd-badge owpd-badge--updates">${
+                updatesTotal === 1
+                  ? escapeHtml(t('updateSingle', '1 Update'))
+                  : escapeHtml(t('updatePlural', '$1 Updates', [updatesTotal]))
+              }</span>`
+            : site.companionActive
+            ? `<span class="owpd-badge owpd-badge--neutral">${escapeHtml(t('upToDate', 'Up to date'))}</span>`
+            : '';
+
+        const wpBadge = site.wpVersion
+          ? `<span class="owpd-badge owpd-badge--neutral">WP ${escapeHtml(site.wpVersion)}</span>`
+          : '';
+
+        const categoryBadge = site.category
+          ? `<span class="owpd-badge owpd-badge--neutral">${escapeHtml(site.category)}</span>`
+          : '';
+
         const bricksBtn = site.bricksActive
           ? `<a href="${cleanUrl}/?bricks=run" target="_blank" rel="noopener" class="owpd-btn owpd-btn--sm">Bricks</a>`
           : '';
 
+        const detailsUrl = `${chrome.runtime.getURL('views/dashboard.html')}#site=${encodeURIComponent(site.id)}`;
+
         return `
-          <div class="sp-site-card" data-id="${site.id}">
-            <div class="sp-site-card__info">
-              <div class="sp-site-card__title">${escapeHtml(site.name)}</div>
-              <div class="sp-site-card__url">${escapeHtml(cleanUrl.replace(/^https?:\/\//, ''))}</div>
+          <article class="sp-card" data-id="${site.id}">
+            <div class="sp-card__top">
+              <div>
+                <h3 class="sp-card__name">${escapeHtml(site.name)}</h3>
+                <a href="${cleanUrl}/" target="_blank" rel="noopener" class="sp-card__url">
+                  ${escapeHtml(cleanUrl.replace(/^https?:\/\//, ''))}
+                </a>
+              </div>
+              ${renderStatusBadge(site)}
             </div>
-            <div class="sp-site-card__actions">
-              <a href="${cleanUrl}/" target="_blank" rel="noopener" class="owpd-btn owpd-btn--sm" title="Frontend">↗</a>
-              ${
-                hasAutoLogin
-                  ? `<button type="button" class="owpd-btn owpd-btn--sm owpd-btn--success" data-action="autologin" data-id="${site.id}">${escapeHtml(t('loginShort', 'Login'))}</button>`
-                  : `<a href="${cleanUrl}/wp-admin/" target="_blank" rel="noopener" class="owpd-btn owpd-btn--sm">${escapeHtml(t('adminShort', 'Admin'))}</a>`
-              }
-              ${bricksBtn}
+
+            <div class="sp-card__meta">
+              ${updateBadge}
+              ${wpBadge}
+              ${categoryBadge}
             </div>
-          </div>
+
+            <div class="sp-card__actions">
+              <div class="sp-card__quicklinks">
+                ${
+                  hasAutoLogin
+                    ? `<button type="button" class="owpd-btn owpd-btn--sm owpd-btn--primary" data-action="autologin" data-id="${site.id}">${escapeHtml(t('oneClickLogin', '1-Click Login'))}</button>`
+                    : `<a href="${cleanUrl}/wp-admin/" target="_blank" rel="noopener" class="owpd-btn owpd-btn--sm owpd-btn--primary">${escapeHtml(t('adminShort', 'Admin'))}</a>`
+                }
+                <a href="${cleanUrl}/wp-admin/plugins.php" target="_blank" rel="noopener" class="owpd-btn owpd-btn--sm">${escapeHtml(t('plugins', 'Plugins'))}</a>
+                ${bricksBtn}
+              </div>
+              <a href="${detailsUrl}" target="_blank" rel="noopener" class="owpd-btn owpd-btn--sm">${escapeHtml(t('detailsArrow', 'Details →'))}</a>
+            </div>
+          </article>
         `;
       })
       .join('');
