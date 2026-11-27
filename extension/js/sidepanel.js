@@ -3,7 +3,7 @@
  *
  * Project: Olpo's WordPressDock (OWPD)
  * Author:  Ole Poetter
- * Version: 0.5.4-beta
+ * Version: 0.5.10-beta
  */
 
 (() => {
@@ -12,7 +12,7 @@
   let state = {
     sites: [],
     prefs: {
-      theme: 'system',
+      themeMode: 'system',
       accentColor: 'carbon-orange',
     },
     searchQuery: '',
@@ -46,6 +46,10 @@
     });
     return out;
   }
+
+  // ---------------------------------------------------------------------------
+  // Lizenz-Helper (Free = max. 3 Instanzen, alle bestehenden Features frei)
+  // ---------------------------------------------------------------------------
 
   function canAddSite(count) {
     return window.OWPDLicense ? window.OWPDLicense.canAddSite(count) : count < 3;
@@ -83,36 +87,30 @@
         renderActiveTabBox();
         renderSitesList();
       }
-      if (changes.theme || changes.accentColor) {
-        if (changes.theme) state.prefs.theme = changes.theme.newValue || 'system';
+      if (changes.themeMode || changes.accentColor) {
+        if (changes.themeMode) state.prefs.themeMode = changes.themeMode.newValue || 'system';
         if (changes.accentColor) state.prefs.accentColor = changes.accentColor.newValue || 'carbon-orange';
-        applyTheme();
+        syncThemeUI();
       }
     });
 
-    const data = await storageGet(['sites', 'theme', 'accentColor']);
+    const data = await storageGet(['sites', 'themeMode', 'accentColor']);
     state.sites = Array.isArray(data.sites) ? data.sites : [];
     state.prefs = {
-      theme: data.theme || 'system',
+      themeMode: data.themeMode || 'system',
       accentColor: data.accentColor || 'carbon-orange',
     };
 
-    applyTheme();
+    syncThemeUI();
     bindHeaderEvents();
     renderPlanBadge();
     await renderActiveTabBox();
     renderSitesList();
   });
 
-  function applyTheme() {
-    if (window.OWPDThemes && typeof window.OWPDThemes.apply === 'function') {
-      window.OWPDThemes.apply({
-        theme: state.prefs.theme,
-        accent: state.prefs.accentColor,
-      });
-    } else {
-      document.documentElement.dataset.theme = state.prefs.theme;
-      document.documentElement.dataset.accent = state.prefs.accentColor;
+  function syncThemeUI() {
+    if (typeof applyThemeAndAccent === 'function') {
+      applyThemeAndAccent(state.prefs.themeMode, state.prefs.accentColor);
     }
   }
 
@@ -132,10 +130,10 @@
     if (themeBtn) {
       themeBtn.addEventListener('click', async () => {
         const order = ['system', 'light', 'dark'];
-        const next = order[(order.indexOf(state.prefs.theme) + 1) % order.length];
-        state.prefs.theme = next;
-        await storageSet({ theme: next });
-        applyTheme();
+        const next = order[(order.indexOf(state.prefs.themeMode) + 1) % order.length];
+        state.prefs.themeMode = next;
+        await storageSet({ themeMode: next });
+        syncThemeUI();
       });
     }
 
