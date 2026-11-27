@@ -183,13 +183,44 @@ jobs:
           prerelease: ${{ contains(steps.meta.outputs.full_version, '-') }}
           files: dist/*.zip
 
-      - name: Publish to Chrome Web Store
+      - name: Publish to Chrome Web Store (API v2)
         if: ${{ inputs.publish_chrome && env.CHROME_CLIENT_ID != '' }}
-        uses: Haberkamp/chrome-webstore-publish@v1
-        with:
-          zip-path: "dist/owpd-extension-${{ steps.meta.outputs.full_version }}.zip"
-          extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
-          publisher-id: ${{ secrets.CHROME_PUBLISHER_ID }}
-          client-id: ${{ secrets.CHROME_CLIENT_ID }}
-          client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
-          refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
+        env:
+          CHROME_PUBLISHER_ID: ${{ secrets.CHROME_PUBLISHER_ID }}
+          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+          CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+          CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+          ZIP_FILE: "dist/owpd-extension-${{ steps.meta.outputs.full_version }}.zip"
+        run: |
+          set -e
+          ACCESS_TOKEN=$(curl -s -X POST "https://oauth2.googleapis.com/token" \
+            -d "client_id=${CHROME_CLIENT_ID}" \
+            -d "client_secret=${CHROME_CLIENT_SECRET}" \
+            -d "refresh_token=${CHROME_REFRESH_TOKEN}" \
+            -d "grant_type=refresh_token" | jq -r '.access_token')
+
+          if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" = "null" ]; then
+            echo "Fehler beim Abrufen des Google OAuth Access Tokens"
+            exit 1
+          fi
+
+          UPLOAD_RES=$(curl -s -X POST \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "Content-Type: application/zip" \
+            --data-binary "@${ZIP_FILE}" \
+            "https://chromewebstore.googleapis.com/upload/v2/publishers/${CHROME_PUBLISHER_ID}/items/${CHROME_EXTENSION_ID}:upload")
+          echo "Upload Response: $UPLOAD_RES"
+
+          UPLOAD_STATE=$(echo "$UPLOAD_RES" | jq -r '.uploadState // empty')
+          if [ "$UPLOAD_STATE" = "FAILED" ]; then
+            echo "Chrome Web Store Upload fehlgeschlagen!"
+            exit 1
+          fi
+
+          PUBLISH_RES=$(curl -s -X POST \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{}' \
+            "https://chromewebstore.googleapis.com/v2/publishers/${CHROME_PUBLISHER_ID}/items/${CHROME_EXTENSION_ID}:publish")
+          echo "Publish Response: $PUBLISH_RES"
