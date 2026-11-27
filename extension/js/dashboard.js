@@ -12,27 +12,25 @@
   const STORAGE_KEYS = {
     SITES: 'owpd_sites',
     SETTINGS: 'owpd_settings',
-    NOTES: 'owpd_dashboard_notes',
   };
 
   const DEFAULT_SETTINGS = {
-    accentColor: '#3b82f6',
-    theme: 'dark',
-    uptimeCheckEnabled: true,
-    openInNewTab: true,
+    theme: 'system',
+    accent: 'blue',
+    notifyOffline: true,
+    notifyUpdates: true,
   };
 
   let state = {
     sites: [],
     settings: { ...DEFAULT_SETTINGS },
-    notes: {},
+    filter: 'all', // 'all' | 'updates' | 'offline' | 'settings'
     searchQuery: '',
-    activeTag: 'all',
     editingSiteId: null,
   };
 
   // ---------------------------------------------------------------------------
-  // Storage Helpers
+  // Storage & Runtime Helpers
   // ---------------------------------------------------------------------------
 
   function storageGet(keys) {
@@ -47,58 +45,16 @@
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // Initialisierung
-  // ---------------------------------------------------------------------------
-
-  document.addEventListener('DOMContentLoaded', async () => {
-    // 1. Lizenz-Status aus dem lokalen Storage laden
-    if (window.OWPDLicense) {
-      await window.OWPDLicense.init();
+  function t(key, fallback) {
+    if (window.OWPDI18n && typeof window.OWPDI18n.t === 'function') {
+      const val = window.OWPDI18n.t(key);
+      if (val && val !== key) return val;
     }
-
-    // 2. Bei Lizenzänderungen UI, Limits und Feature-Locks sofort aktualisieren
-    window.addEventListener('owpd:license-changed', () => {
-      applyThemeAndSettings();
-      renderLicenseStatusUI();
-      renderTagFilters();
-      renderSitesGrid();
-      renderNotesPanel();
-    });
-
-    // 3. Daten aus chrome.storage.local laden
-    await loadAllData();
-
-    // 4. UI initialisieren & Event-Listener binden
-    applyThemeAndSettings();
-    bindNavigationAndModals();
-    bindLicenseForm();
-    bindSiteForm();
-    bindBackupAndSync();
-    bindNotesEvents();
-
-    renderLicenseStatusUI();
-    renderTagFilters();
-    renderSitesGrid();
-    renderNotesPanel();
-  });
-
-  async function loadAllData() {
-    const data = await storageGet([
-      STORAGE_KEYS.SITES,
-      STORAGE_KEYS.SETTINGS,
-      STORAGE_KEYS.NOTES,
-    ]);
-
-    state.sites = Array.isArray(data[STORAGE_KEYS.SITES]) ? data[STORAGE_KEYS.SITES] : [];
-    state.settings = { ...DEFAULT_SETTINGS, ...(data[STORAGE_KEYS.SETTINGS] || {}) };
-    state.notes = data[STORAGE_KEYS.NOTES] && typeof data[STORAGE_KEYS.NOTES] === 'object'
-      ? data[STORAGE_KEYS.NOTES]
-      : {};
+    return fallback;
   }
 
   // ---------------------------------------------------------------------------
-  // Lizenz-Helper & UI-Status
+  // Lizenz-Helper
   // ---------------------------------------------------------------------------
 
   function hasFeature(key) {
@@ -125,53 +81,124 @@
       container = document.createElement('div');
       container.id = 'owpd-toast-container';
       container.style.cssText =
-        'position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;';
+        'position:fixed;bottom:1.6rem;right:1.6rem;z-index:9999;display:flex;flex-direction:column;gap:0.6rem;';
       document.body.appendChild(container);
     }
 
     const toast = document.createElement('div');
-    const bg =
-      type === 'error' ? '#dc2626' : type === 'success' ? '#16a34a' : '#1e293b';
-    toast.style.cssText = `background:${bg};color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,0.35);max-width:340px;line-height:1.4;`;
+    const bg = type === 'error' ? '#dc2626' : type === 'success' ? '#16a34a' : '#1e293b';
+    toast.style.cssText = `background:${bg};color:#fff;padding:0.9rem 1.4rem;border-radius:0.8rem;font-size:1.3rem;box-shadow:0 8px 24px rgba(0,0,0,0.35);max-width:34rem;line-height:1.4;`;
     toast.textContent = message;
     container.appendChild(toast);
 
-    setTimeout(() => {
-      toast.remove();
-    }, 4200);
+    setTimeout(() => toast.remove(), 4200);
   }
 
   function promptUpgrade(featureLabel, requiredPlan = 'Pro') {
     showToast(
-      `„${featureLabel}“ ist ab OWPD ${requiredPlan} verfügbar. Aktiviere deinen Lizenzschlüssel unter Einstellungen → Lizenz.`,
+      `„${featureLabel}“ ist ab OWPD ${requiredPlan} verfügbar. Aktiviere deine Lizenz unter Settings.`,
       'info'
     );
-    openSettingsSection('license');
+    switchView('settings');
   }
 
-  function renderLicenseStatusUI() {
+  // ---------------------------------------------------------------------------
+  // Initialisierung
+  // ---------------------------------------------------------------------------
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (window.OWPDLicense) {
+      await window.OWPDLicense.init();
+    }
+
+    window.addEventListener('owpd:license-changed', () => {
+      applyThemeAndAccent();
+      renderLicenseUI();
+      renderStats();
+      renderGrid();
+    });
+
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local') return;
+      if (changes[STORAGE_KEYS.SITES]) {
+        state.sites = Array.isArray(changes[STORAGE_KEYS.SITES].newValue)
+          ? changes[STORAGE_KEYS.SITES].newValue
+          : [];
+        renderStats();
+        renderGrid();
+      }
+      if (changes[STORAGE_KEYS.SETTINGS]) {
+        state.settings = { ...DEFAULT_SETTINGS, ...(changes[STORAGE_KEYS.SETTINGS].newValue || {}) };
+        applyThemeAndAccent();
+      }
+    });
+
+    await loadData();
+    applyThemeAndAccent();
+    bindNavigation();
+    bindTopbarAndModal();
+    bindSettingsControls();
+    bindLicenseControls();
+    bindBackupControls();
+
+    renderLicenseUI();
+    renderStats();
+    renderGrid();
+  });
+
+  async function loadData() {
+    const data = await storageGet([STORAGE_KEYS.SITES, STORAGE_KEYS.SETTINGS]);
+    state.sites = Array.isArray(data[STORAGE_KEYS.SITES]) ? data[STORAGE_KEYS.SITES] : [];
+    state.settings = { ...DEFAULT_SETTINGS, ...(data[STORAGE_KEYS.SETTINGS] || {}) };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Theme & Akzentfarben (themes.js Integration)
+  // ---------------------------------------------------------------------------
+
+  function applyThemeAndAccent() {
+    const canCustomAccent = hasFeature('accent_themes');
+    const effectiveAccent = canCustomAccent ? state.settings.accent || 'blue' : 'blue';
+
+    if (window.OWPDThemes && typeof window.OWPDThemes.apply === 'function') {
+      window.OWPDThemes.apply({
+        theme: state.settings.theme || 'system',
+        accent: effectiveAccent,
+      });
+    } else {
+      document.documentElement.dataset.theme = state.settings.theme || 'system';
+      document.documentElement.dataset.accent = effectiveAccent;
+    }
+
+    document.querySelectorAll('#settings-theme-group [data-theme-choice]').forEach((btn) => {
+      btn.classList.toggle('is-active', btn.dataset.themeChoice === (state.settings.theme || 'system'));
+    });
+
+    const accentGrid = document.getElementById('settings-accent-grid');
+    if (accentGrid) {
+      accentGrid.classList.toggle('is-locked', !canCustomAccent);
+      accentGrid.title = canCustomAccent ? '' : 'Pro-Feature: Eigene Akzentfarben';
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Lizenz-UI im Settings-Bereich & Header
+  // ---------------------------------------------------------------------------
+
+  function renderLicenseUI() {
     const lic = getLicenseState();
     const maxSites = getMaxSites();
 
-    // Header-/Sidebar-Badge aktualisieren
-    const planBadge = document.getElementById('owpd-plan-badge');
-    if (planBadge) {
-      planBadge.textContent = lic.plan_label || 'Free';
-      planBadge.dataset.plan = lic.plan || 'free';
+    const badge = document.getElementById('db-plan-badge');
+    if (badge) {
+      badge.textContent = lic.plan_label || 'Free';
+      badge.dataset.plan = lic.plan || 'free';
     }
 
-    // Instanz-Zähler im Header (z. B. "2 / 3 Instanzen" oder "14 / ∞ Instanzen")
-    const siteCounter = document.getElementById('owpd-site-counter');
-    if (siteCounter) {
-      const maxLabel = maxSites >= 9999 ? '∞' : maxSites;
-      siteCounter.textContent = `${state.sites.length} / ${maxLabel} Instanzen`;
-    }
-
-    // Einstellungs-Tab: Lizenz-Statusanzeige
-    const statusBox = document.getElementById('owpd-license-status-box');
-    const keyInput = document.getElementById('owpd-license-key-input');
-    const deactivateBtn = document.getElementById('owpd-license-deactivate-btn');
-    const revalidateBtn = document.getElementById('owpd-license-revalidate-btn');
+    const statusBox = document.getElementById('settings-license-status');
+    const keyInput = document.getElementById('setting-license-key');
+    const revalidateBtn = document.getElementById('btn-revalidate-license');
+    const deactivateBtn = document.getElementById('btn-deactivate-license');
 
     if (keyInput && lic.license_key && !keyInput.value) {
       keyInput.value = lic.license_key;
@@ -179,101 +206,80 @@
 
     if (statusBox) {
       if (lic.valid) {
-        const expiryInfo = lic.expires_at
+        const maxLabel = maxSites >= 9999 ? 'Unbegrenzt' : `${maxSites} Instanzen`;
+        const expiryText = lic.expires_at
           ? `Aktiv bis: ${lic.expires_at} (monatliche Ko-fi Membership)`
           : 'Unbegrenzte Lizenz';
         statusBox.innerHTML = `
-          <div style="padding:12px;border-radius:8px;background:rgba(22,163,74,0.12);border:1px solid rgba(22,163,74,0.35);">
+          <div style="padding:1rem 1.2rem;border-radius:0.8rem;background:rgba(22,163,74,0.12);border:1px solid rgba(22,163,74,0.35);font-size:1.3rem;">
             <strong>● Aktiv: OWPD ${escapeHtml(lic.plan_label)}</strong><br>
-            <span style="font-size:12px;opacity:0.85;">
-              Instanz-Limit: ${maxSites >= 9999 ? 'Unbegrenzt' : maxSites + ' Websites'} ·
-              Geräte: ${lic.used_activations} / ${lic.max_activations}<br>
-              ${escapeHtml(expiryInfo)}
+            <span style="opacity:0.85;font-size:1.2rem;">
+              Limit: ${maxLabel} · Geräte: ${lic.used_activations} / ${lic.max_activations} · ${escapeHtml(expiryText)}
             </span>
           </div>
         `;
       } else {
         statusBox.innerHTML = `
-          <div style="padding:12px;border-radius:8px;background:rgba(148,163,184,0.12);border:1px solid rgba(148,163,184,0.25);">
+          <div style="padding:1rem 1.2rem;border-radius:0.8rem;background:rgba(148,163,184,0.12);border:1px solid rgba(148,163,184,0.25);font-size:1.3rem;">
             <strong>Tarif: OWPD Free (max. 3 Instanzen)</strong><br>
-            <span style="font-size:12px;opacity:0.85;">
-              Hol dir eine monatliche Ko-fi Membership für Pro (6 Instanzen + Magic Login &amp; Bricks-Actions) oder Ultimate (Unbegrenzte Instanzen + Sync &amp; Notizen).
+            <span style="opacity:0.85;font-size:1.2rem;">
+              Schalte mit einer monatlichen Ko-fi Membership Pro (6 Instanzen, Magic Login &amp; Bricks-Actions) oder Ultimate (Unbegrenzt, JSON-Sync &amp; Notizen) frei.
             </span>
           </div>
         `;
       }
     }
 
-    if (deactivateBtn) {
-      deactivateBtn.style.display = lic.valid ? 'inline-flex' : 'none';
-    }
-    if (revalidateBtn) {
-      revalidateBtn.style.display = lic.license_key ? 'inline-flex' : 'none';
-    }
+    if (revalidateBtn) revalidateBtn.hidden = !lic.license_key;
+    if (deactivateBtn) deactivateBtn.hidden = !lic.valid;
 
-    // Lock-Status an Pro-/Ultimate-Buttons in den Einstellungen setzen
-    updateFeatureGateControls();
-  }
-
-  function updateFeatureGateControls() {
-    // Akzentfarben-Picker (Pro)
-    const accentInput = document.getElementById('owpd-setting-accent');
-    if (accentInput) {
-      accentInput.disabled = !hasFeature('accent_themes');
-      accentInput.title = hasFeature('accent_themes')
-        ? 'Eigene Akzentfarbe wählen'
-        : 'Pro-Feature: Eigene Akzentfarben';
-    }
-
-    // Uptime-Alerts Toggle (Pro)
-    const uptimeToggle = document.getElementById('owpd-setting-uptime');
-    if (uptimeToggle) {
-      uptimeToggle.disabled = !hasFeature('uptime_alerts');
-    }
-
-    // JSON-Export / Import Buttons (Ultimate)
-    const exportBtn = document.getElementById('owpd-export-json-btn');
-    const importBtn = document.getElementById('owpd-import-json-btn');
     const canSync = hasFeature('json_sync');
+    const exportBtn = document.getElementById('db-export-btn');
+    const importInput = document.getElementById('db-import-input');
+    const importLabel = importInput ? importInput.closest('label') : null;
 
     if (exportBtn) {
       exportBtn.classList.toggle('is-locked', !canSync);
-      exportBtn.title = canSync ? 'Backup als JSON exportieren' : 'Ultimate-Feature: JSON-Backup & Sync';
+      exportBtn.title = canSync ? '' : 'Ultimate-Feature: JSON Export';
     }
-    if (importBtn) {
-      importBtn.classList.toggle('is-locked', !canSync);
-      importBtn.title = canSync ? 'Backup aus JSON importieren' : 'Ultimate-Feature: JSON-Backup & Sync';
+    if (importLabel) {
+      importLabel.classList.toggle('is-locked', !canSync);
+      importLabel.title = canSync ? '' : 'Ultimate-Feature: JSON Import';
+    }
+
+    const notesField = document.getElementById('field-notes');
+    if (notesField) {
+      const canNotes = hasFeature('dashboard_notes');
+      notesField.disabled = !canNotes;
+      notesField.placeholder = canNotes
+        ? t('placeholderNotes', 'Notes...')
+        : 'Ultimate-Feature: Instanz-Notizen';
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Lizenz-Formular Events
-  // ---------------------------------------------------------------------------
-
-  function bindLicenseForm() {
-    const activateBtn = document.getElementById('owpd-license-activate-btn');
-    const keyInput = document.getElementById('owpd-license-key-input');
-    const deactivateBtn = document.getElementById('owpd-license-deactivate-btn');
-    const revalidateBtn = document.getElementById('owpd-license-revalidate-btn');
+  function bindLicenseControls() {
+    const keyInput = document.getElementById('setting-license-key');
+    const activateBtn = document.getElementById('btn-activate-license');
+    const revalidateBtn = document.getElementById('btn-revalidate-license');
+    const deactivateBtn = document.getElementById('btn-deactivate-license');
 
     if (activateBtn && keyInput) {
       activateBtn.addEventListener('click', async () => {
         if (!window.OWPDLicense) return;
         const rawKey = keyInput.value.trim();
         activateBtn.disabled = true;
-        const origText = activateBtn.textContent;
-        activateBtn.textContent = 'Prüfe...';
+        const orig = activateBtn.textContent;
+        activateBtn.textContent = '...';
 
-        const result = await window.OWPDLicense.activate(rawKey);
-
+        const res = await window.OWPDLicense.activate(rawKey);
         activateBtn.disabled = false;
-        activateBtn.textContent = origText;
+        activateBtn.textContent = orig;
 
-        if (result.ok) {
-          showToast(`OWPD ${result.state.plan_label} erfolgreich aktiviert!`, 'success');
-          renderLicenseStatusUI();
+        if (res.ok) {
+          showToast(`OWPD ${res.state.plan_label} aktiviert!`, 'success');
+          renderLicenseUI();
         } else {
-          showToast(result.message || 'Lizenzschlüssel ungültig.', 'error');
+          showToast(res.message || 'Lizenzschlüssel ungültig.', 'error');
         }
       });
     }
@@ -282,15 +288,15 @@
       revalidateBtn.addEventListener('click', async () => {
         if (!window.OWPDLicense) return;
         revalidateBtn.disabled = true;
-        const result = await window.OWPDLicense.revalidate();
+        const res = await window.OWPDLicense.revalidate();
         revalidateBtn.disabled = false;
 
-        if (result.ok) {
+        if (res.ok) {
           showToast('Lizenzstatus erfolgreich aktualisiert.', 'success');
         } else {
-          showToast(result.message || 'Lizenz nicht mehr aktiv.', 'error');
+          showToast(res.message || 'Lizenz nicht mehr aktiv.', 'error');
         }
-        renderLicenseStatusUI();
+        renderLicenseUI();
       });
     }
 
@@ -299,419 +305,281 @@
         if (!window.OWPDLicense) return;
         await window.OWPDLicense.deactivateLocal();
         if (keyInput) keyInput.value = '';
-        showToast('Lizenz auf diesem Gerät entfernt (Free-Modus aktiv).', 'info');
-        renderLicenseStatusUI();
+        showToast('Lizenz auf diesem Gerät entfernt (Free-Modus).', 'info');
+        renderLicenseUI();
       });
     }
   }
 
   // ---------------------------------------------------------------------------
-  // Theme & Einstellungen anwenden
+  // Sidebar Navigation & Views
   // ---------------------------------------------------------------------------
 
-  function applyThemeAndSettings() {
-    const effectiveAccent = hasFeature('accent_themes')
-      ? state.settings.accentColor || DEFAULT_SETTINGS.accentColor
-      : DEFAULT_SETTINGS.accentColor;
+  function switchView(filter) {
+    state.filter = filter;
 
-    document.documentElement.style.setProperty('--owpd-accent', effectiveAccent);
-    document.documentElement.dataset.theme = state.settings.theme || 'dark';
+    document.querySelectorAll('#db-category-nav .db-nav__item').forEach((btn) => {
+      btn.classList.toggle('db-nav__item--active', btn.dataset.filter === filter);
+    });
+
+    const sitesView = document.getElementById('db-sites-view');
+    const settingsView = document.getElementById('db-settings-view');
+
+    if (filter === 'settings') {
+      if (sitesView) sitesView.hidden = true;
+      if (settingsView) settingsView.hidden = false;
+      renderLicenseUI();
+    } else {
+      if (sitesView) sitesView.hidden = false;
+      if (settingsView) settingsView.hidden = true;
+      renderGrid();
+    }
+  }
+
+  function bindNavigation() {
+    document.querySelectorAll('#db-category-nav .db-nav__item').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        switchView(btn.dataset.filter || 'all');
+      });
+    });
+
+    const themeToggle = document.getElementById('db-theme-toggle');
+    if (themeToggle) {
+      themeToggle.addEventListener('click', async () => {
+        const order = ['system', 'light', 'dark'];
+        const next = order[(order.indexOf(state.settings.theme) + 1) % order.length];
+        state.settings.theme = next;
+        await storageSet({ [STORAGE_KEYS.SETTINGS]: state.settings });
+        applyThemeAndAccent();
+      });
+    }
   }
 
   // ---------------------------------------------------------------------------
-  // Navigation, Suche & Modals
+  // Topbar, Suche & Modal (#db-modal-backdrop / #site-form)
   // ---------------------------------------------------------------------------
 
-  function bindNavigationAndModals() {
-    const searchInput = document.getElementById('owpd-search-input');
+  function bindTopbarAndModal() {
+    const searchInput = document.getElementById('db-search');
     if (searchInput) {
       searchInput.addEventListener('input', (e) => {
         state.searchQuery = e.target.value.trim().toLowerCase();
-        renderSitesGrid();
+        renderGrid();
       });
     }
 
-    const addSiteBtn = document.getElementById('owpd-add-site-btn');
-    if (addSiteBtn) {
-      addSiteBtn.addEventListener('click', () => {
+    const addBtn = document.getElementById('db-add-btn');
+    if (addBtn) {
+      addBtn.addEventListener('click', () => {
         if (!canAddSite(state.sites.length)) {
           const lic = getLicenseState();
-          const nextTier = lic.plan === 'free' ? 'Pro (bis zu 6 Instanzen)' : 'Ultimate (unbegrenzte Instanzen)';
+          const nextPlan = lic.plan === 'free' ? 'Pro (6 Instanzen)' : 'Ultimate (Unbegrenzt)';
           showToast(
-            `Limit erreicht (${state.sites.length}/${getMaxSites()}). Upgrade auf OWPD ${nextTier}, um weitere Websites hinzuzufügen.`,
+            `Limit erreicht (${state.sites.length}/${getMaxSites()}). Upgrade auf OWPD ${nextPlan} für weitere Sites.`,
             'error'
           );
-          openSettingsSection('license');
+          switchView('settings');
           return;
         }
         openSiteModal(null);
       });
     }
 
-    const openSettingsBtn = document.getElementById('owpd-open-settings-btn');
-    if (openSettingsBtn) {
-      openSettingsBtn.addEventListener('click', () => openSettingsSection('general'));
-    }
-
-    document.querySelectorAll('[data-close-modal]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const modal = btn.closest('.owpd-modal');
-        if (modal) modal.classList.remove('is-open');
-      });
-    });
-
-    // Einstellungs-Speicherung
-    const accentInput = document.getElementById('owpd-setting-accent');
-    if (accentInput) {
-      accentInput.value = state.settings.accentColor;
-      accentInput.addEventListener('change', async (e) => {
-        if (!hasFeature('accent_themes')) {
-          e.target.value = DEFAULT_SETTINGS.accentColor;
-          promptUpgrade('Eigene Akzentfarben', 'Pro');
-          return;
-        }
-        state.settings.accentColor = e.target.value;
-        await storageSet({ [STORAGE_KEYS.SETTINGS]: state.settings });
-        applyThemeAndSettings();
+    const checkAllBtn = document.getElementById('db-check-all');
+    if (checkAllBtn) {
+      checkAllBtn.addEventListener('click', () => {
+        chrome.runtime.sendMessage({ type: 'OWPD_CHECK_ALL_SITES' }, () => {
+          showToast('Statusprüfung für alle Instanzen gestartet.', 'info');
+        });
       });
     }
 
-    const uptimeToggle = document.getElementById('owpd-setting-uptime');
-    if (uptimeToggle) {
-      uptimeToggle.checked = Boolean(state.settings.uptimeCheckEnabled && hasFeature('uptime_alerts'));
-      uptimeToggle.addEventListener('change', async (e) => {
-        if (!hasFeature('uptime_alerts')) {
-          e.target.checked = false;
-          promptUpgrade('Uptime- & Update-Benachrichtigungen', 'Pro');
+    const backdrop = document.getElementById('db-modal-backdrop');
+    const closeBtn = document.getElementById('modal-close');
+    if (closeBtn && backdrop) {
+      closeBtn.addEventListener('click', () => backdrop.classList.remove('is-open'));
+      backdrop.addEventListener('click', (e) => {
+        if (e.target === backdrop) backdrop.classList.remove('is-open');
+      });
+    }
+
+    const form = document.getElementById('site-form');
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const id = document.getElementById('field-id').value;
+        if (!id && !canAddSite(state.sites.length)) {
+          showToast(`Maximales Limit (${getMaxSites()} Instanzen) erreicht.`, 'error');
           return;
         }
-        state.settings.uptimeCheckEnabled = e.target.checked;
-        await storageSet({ [STORAGE_KEYS.SETTINGS]: state.settings });
+
+        const rawUrl = document.getElementById('field-url').value.trim().replace(/\/+$/, '');
+        const existing = id ? state.sites.find((s) => s.id === id) : null;
+
+        const siteData = {
+          ...(existing || {}),
+          id: id || 'site-' + Date.now().toString(36),
+          name: document.getElementById('field-name').value.trim() || rawUrl,
+          category: document.getElementById('field-category').value.trim(),
+          url: rawUrl,
+          username: document.getElementById('field-username').value.trim(),
+          appPassword: document.getElementById('field-app-password').value,
+          notes: hasFeature('dashboard_notes')
+            ? document.getElementById('field-notes').value
+            : existing?.notes || '',
+          updatedAt: Date.now(),
+        };
+
+        if (id) {
+          const idx = state.sites.findIndex((s) => s.id === id);
+          if (idx !== -1) state.sites[idx] = siteData;
+        } else {
+          siteData.createdAt = Date.now();
+          state.sites.push(siteData);
+        }
+
+        await storageSet({ [STORAGE_KEYS.SITES]: state.sites });
+        if (backdrop) backdrop.classList.remove('is-open');
+        renderStats();
+        renderGrid();
+        showToast('Installation gespeichert.', 'success');
+      });
+    }
+
+    const deleteBtn = document.getElementById('modal-delete-btn');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', async () => {
+        const id = document.getElementById('field-id').value;
+        if (!id) return;
+        state.sites = state.sites.filter((s) => s.id !== id);
+        await storageSet({ [STORAGE_KEYS.SITES]: state.sites });
+        if (backdrop) backdrop.classList.remove('is-open');
+        renderStats();
+        renderGrid();
+        showToast('Installation gelöscht.', 'info');
+      });
+    }
+
+    const checkBtn = document.getElementById('modal-check-btn');
+    if (checkBtn) {
+      checkBtn.addEventListener('click', () => {
+        const id = document.getElementById('field-id').value;
+        if (!id) return;
+        chrome.runtime.sendMessage({ type: 'OWPD_CHECK_SITE', siteId: id }, () => {
+          showToast('Status wird geprüft...', 'info');
+        });
       });
     }
   }
-
-  function openSettingsSection(tab = 'general') {
-    const modal = document.getElementById('owpd-settings-modal');
-    if (!modal) return;
-    modal.classList.add('is-open');
-
-    modal.querySelectorAll('[data-settings-tab]').forEach((el) => {
-      el.classList.toggle('is-active', el.dataset.settingsTab === tab);
-    });
-    modal.querySelectorAll('[data-settings-panel]').forEach((panel) => {
-      panel.style.display = panel.dataset.settingsPanel === tab ? 'block' : 'none';
-    });
-  }
-
-  // ---------------------------------------------------------------------------
-  // WordPress-Instanzen CRUD
-  // ---------------------------------------------------------------------------
 
   function openSiteModal(site = null) {
-    const modal = document.getElementById('owpd-site-modal');
-    const form = document.getElementById('owpd-site-form');
-    if (!modal || !form) return;
+    const backdrop = document.getElementById('db-modal-backdrop');
+    if (!backdrop) return;
 
-    state.editingSiteId = site ? site.id : null;
+    document.getElementById('modal-title').textContent = site
+      ? site.name
+      : t('addNewSite', '+ New WordPress Site');
+    document.getElementById('field-id').value = site ? site.id : '';
+    document.getElementById('field-name').value = site ? site.name || '' : '';
+    document.getElementById('field-category').value = site ? site.category || '' : '';
+    document.getElementById('field-url').value = site ? site.url || '' : 'https://';
+    document.getElementById('field-username').value = site ? site.username || '' : '';
+    document.getElementById('field-app-password').value = site ? site.appPassword || '' : '';
 
-    form.elements.name.value = site ? site.name : '';
-    form.elements.url.value = site ? site.url : 'https://';
-    form.elements.adminPath.value = site ? site.adminPath || '/wp-admin/' : '/wp-admin/';
-    form.elements.username.value = site ? site.username || '' : '';
-    form.elements.password.value = site ? site.password || '' : '';
-    form.elements.tags.value = site && Array.isArray(site.tags) ? site.tags.join(', ') : '';
-    form.elements.isBricks.checked = site ? Boolean(site.isBricks) : false;
-
-    const titleEl = document.getElementById('owpd-site-modal-title');
-    if (titleEl) {
-      titleEl.textContent = site ? 'WordPress-Instanz bearbeiten' : 'Neue WordPress-Instanz hinzufügen';
+    const notesEl = document.getElementById('field-notes');
+    if (notesEl) {
+      notesEl.value = site ? site.notes || '' : '';
+      notesEl.disabled = !hasFeature('dashboard_notes');
     }
 
-    modal.classList.add('is-open');
-  }
+    const deleteBtn = document.getElementById('modal-delete-btn');
+    const checkBtn = document.getElementById('modal-check-btn');
+    if (deleteBtn) deleteBtn.hidden = !site;
+    if (checkBtn) checkBtn.hidden = !site;
 
-  function bindSiteForm() {
-    const form = document.getElementById('owpd-site-form');
-    if (!form) return;
-
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      // Beim Neuanlegen nochmal hart gegen das Tarif-Limit prüfen
-      if (!state.editingSiteId && !canAddSite(state.sites.length)) {
-        showToast(
-          `Maximale Instanz-Anzahl (${getMaxSites()}) im aktuellen Tarif erreicht.`,
-          'error'
-        );
-        return;
-      }
-
-      const rawUrl = form.elements.url.value.trim().replace(/\/+$/, '');
-      const tags = form.elements.tags.value
-        .split(',')
-        .map((t) => t.trim())
-        .filter(Boolean);
-
-      const sitePayload = {
-        id: state.editingSiteId || 'site-' + Date.now().toString(36),
-        name: form.elements.name.value.trim() || rawUrl,
-        url: rawUrl,
-        adminPath: form.elements.adminPath.value.trim() || '/wp-admin/',
-        username: form.elements.username.value.trim(),
-        password: form.elements.password.value,
-        tags,
-        isBricks: Boolean(form.elements.isBricks.checked),
-        updatedAt: Date.now(),
-      };
-
-      if (state.editingSiteId) {
-        const idx = state.sites.findIndex((s) => s.id === state.editingSiteId);
-        if (idx !== -1) {
-          state.sites[idx] = { ...state.sites[idx], ...sitePayload };
-        }
-      } else {
-        sitePayload.createdAt = Date.now();
-        state.sites.push(sitePayload);
-      }
-
-      await storageSet({ [STORAGE_KEYS.SITES]: state.sites });
-
-      const modal = document.getElementById('owpd-site-modal');
-      if (modal) modal.classList.remove('is-open');
-
-      renderLicenseStatusUI();
-      renderTagFilters();
-      renderSitesGrid();
-      showToast('WordPress-Instanz gespeichert.', 'success');
-    });
-  }
-
-  async function deleteSite(siteId) {
-    state.sites = state.sites.filter((s) => s.id !== siteId);
-    await storageSet({ [STORAGE_KEYS.SITES]: state.sites });
-    renderLicenseStatusUI();
-    renderTagFilters();
-    renderSitesGrid();
-    showToast('Instanz entfernt.', 'info');
+    backdrop.classList.add('is-open');
   }
 
   // ---------------------------------------------------------------------------
-  // Rendering: Tags & Instanz-Karten
+  // Settings Controls (Color Mode, Accent, Notifications)
   // ---------------------------------------------------------------------------
 
-  function renderTagFilters() {
-    const container = document.getElementById('owpd-tag-filters');
-    if (!container) return;
-
-    const tagSet = new Set();
-    state.sites.forEach((s) => {
-      if (Array.isArray(s.tags)) {
-        s.tags.forEach((t) => tagSet.add(t));
-      }
-    });
-
-    const tags = ['all', ...Array.from(tagSet)];
-    container.innerHTML = tags
-      .map((tag) => {
-        const activeClass = state.activeTag === tag ? 'is-active' : '';
-        const label = tag === 'all' ? 'Alle' : escapeHtml(tag);
-        return `<button type="button" class="owpd-tag-chip ${activeClass}" data-tag="${escapeHtml(tag)}">${label}</button>`;
-      })
-      .join('');
-
-    container.querySelectorAll('.owpd-tag-chip').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        state.activeTag = btn.dataset.tag;
-        renderTagFilters();
-        renderSitesGrid();
+  function bindSettingsControls() {
+    document.querySelectorAll('#settings-theme-group [data-theme-choice]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        state.settings.theme = btn.dataset.themeChoice;
+        await storageSet({ [STORAGE_KEYS.SETTINGS]: state.settings });
+        applyThemeAndAccent();
       });
     });
-  }
 
-  function renderSitesGrid() {
-    const grid = document.getElementById('owpd-sites-grid');
-    if (!grid) return;
+    const accentGrid = document.getElementById('settings-accent-grid');
+    if (accentGrid) {
+      accentGrid.addEventListener('click', async (e) => {
+        const swatch = e.target.closest('[data-accent]');
+        if (!swatch) return;
 
-    const canMagicLogin = hasFeature('1click_login');
-    const canBricks = hasFeature('bricks_quick_actions');
-    const canNotes = hasFeature('dashboard_notes');
-
-    const filtered = state.sites.filter((site) => {
-      const matchesTag =
-        state.activeTag === 'all' ||
-        (Array.isArray(site.tags) && site.tags.includes(state.activeTag));
-      const matchesQuery =
-        !state.searchQuery ||
-        site.name.toLowerCase().includes(state.searchQuery) ||
-        site.url.toLowerCase().includes(state.searchQuery);
-      return matchesTag && matchesQuery;
-    });
-
-    if (filtered.length === 0) {
-      grid.innerHTML = `
-        <div class="owpd-empty-state" style="grid-column:1/-1;text-align:center;padding:40px 20px;opacity:0.75;">
-          <p>Keine WordPress-Instanzen gefunden.</p>
-        </div>
-      `;
-      return;
-    }
-
-    grid.innerHTML = filtered
-      .map((site) => {
-        const adminUrl = `${site.url}${site.adminPath || '/wp-admin/'}`;
-        const bricksButtons = site.isBricks
-          ? `
-            <button type="button" class="owpd-btn owpd-btn-sm ${canBricks ? '' : 'is-locked'}" data-action="bricks-pages" data-id="${site.id}" title="${canBricks ? 'Bricks Seiten öffnen' : 'Pro-Feature: Bricks Quick-Actions'}">
-              Bricks ${canBricks ? '' : '🔒'}
-            </button>
-          `
-          : '';
-
-        const noteBadge =
-          canNotes && state.notes[site.id]
-            ? `<span class="owpd-note-indicator" title="Notiz vorhanden">📝</span>`
-            : '';
-
-        return `
-          <article class="owpd-site-card" data-site-id="${site.id}">
-            <div class="owpd-site-card__header">
-              <div>
-                <h3 class="owpd-site-card__title">${escapeHtml(site.name)} ${noteBadge}</h3>
-                <a href="${escapeHtml(site.url)}" target="_blank" rel="noopener" class="owpd-site-card__url">${escapeHtml(site.url)}</a>
-              </div>
-              <div class="owpd-site-card__menu">
-                <button type="button" class="owpd-icon-btn" data-action="note" data-id="${site.id}" title="${canNotes ? 'Notiz bearbeiten' : 'Ultimate-Feature: Instanz-Notizen'}">📝</button>
-                <button type="button" class="owpd-icon-btn" data-action="edit" data-id="${site.id}" title="Bearbeiten">✎</button>
-                <button type="button" class="owpd-icon-btn" data-action="delete" data-id="${site.id}" title="Löschen">✕</button>
-              </div>
-            </div>
-
-            <div class="owpd-site-card__actions" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;">
-              <a href="${escapeHtml(adminUrl)}" target="_blank" rel="noopener" class="owpd-btn owpd-btn-sm">WP-Admin</a>
-              <button type="button" class="owpd-btn owpd-btn-sm owpd-btn-primary ${canMagicLogin ? '' : 'is-locked'}" data-action="magic-login" data-id="${site.id}" title="${canMagicLogin ? '1-Klick Magic Login' : 'Pro-Feature: 1-Klick Magic Login'}">
-                Magic Login ${canMagicLogin ? '' : '🔒'}
-              </button>
-              ${bricksButtons}
-            </div>
-          </article>
-        `;
-      })
-      .join('');
-
-    // Karten-Actions binden
-    grid.querySelectorAll('[data-action]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const action = btn.dataset.action;
-        const site = state.sites.find((s) => s.id === btn.dataset.id);
-        if (!site) return;
-
-        if (action === 'magic-login') {
-          if (!hasFeature('1click_login')) {
-            promptUpgrade('1-Klick Magic Login', 'Pro');
-            return;
-          }
-          triggerMagicLogin(site);
-        } else if (action === 'bricks-pages') {
-          if (!hasFeature('bricks_quick_actions')) {
-            promptUpgrade('Bricks Builder Quick-Actions', 'Pro');
-            return;
-          }
-          chrome.tabs.create({ url: `${site.url}/wp-admin/edit.php?post_type=page` });
-        } else if (action === 'note') {
-          if (!hasFeature('dashboard_notes')) {
-            promptUpgrade('Instanz-Notizen & Checklisten', 'Ultimate');
-            return;
-          }
-          openSiteNoteEditor(site);
-        } else if (action === 'edit') {
-          openSiteModal(site);
-        } else if (action === 'delete') {
-          if (confirm(`Instanz „${site.name}“ wirklich löschen?`)) {
-            deleteSite(site.id);
-          }
-        }
-      });
-    });
-  }
-
-  function triggerMagicLogin(site) {
-    if (!site.username || !site.password) {
-      showToast('Bitte hinterlege zuerst Benutzername & Passwort in den Instanz-Einstellungen.', 'info');
-      openSiteModal(site);
-      return;
-    }
-
-    chrome.runtime.sendMessage(
-      {
-        type: 'OWPD_MAGIC_LOGIN',
-        site,
-      },
-      (res) => {
-        if (chrome.runtime.lastError || !res?.ok) {
-          // Fallback: WP-Login-Tab direkt öffnen
-          chrome.tabs.create({ url: `${site.url}/wp-login.php` });
-        }
-      }
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Ultimate Feature: Instanz-Notizen
-  // ---------------------------------------------------------------------------
-
-  function bindNotesEvents() {
-    const saveNoteBtn = document.getElementById('owpd-save-note-btn');
-    if (saveNoteBtn) {
-      saveNoteBtn.addEventListener('click', async () => {
-        if (!hasFeature('dashboard_notes')) {
-          promptUpgrade('Instanz-Notizen & Checklisten', 'Ultimate');
+        if (!hasFeature('accent_themes')) {
+          promptUpgrade('Primary Accent Color', 'Pro');
           return;
         }
-        const siteId = saveNoteBtn.dataset.siteId;
-        const textarea = document.getElementById('owpd-note-textarea');
-        if (!siteId || !textarea) return;
 
-        state.notes[siteId] = textarea.value;
-        await storageSet({ [STORAGE_KEYS.NOTES]: state.notes });
-        renderSitesGrid();
-        showToast('Notiz gespeichert.', 'success');
+        state.settings.accent = swatch.dataset.accent;
+        await storageSet({ [STORAGE_KEYS.SETTINGS]: state.settings });
+        applyThemeAndAccent();
+      });
+    }
+
+    const notifyOffline = document.getElementById('setting-notify-offline');
+    if (notifyOffline) {
+      notifyOffline.checked = Boolean(state.settings.notifyOffline);
+      notifyOffline.addEventListener('change', async (e) => {
+        if (!hasFeature('uptime_alerts') && e.target.checked) {
+          e.target.checked = false;
+          promptUpgrade('Offline-Benachrichtigungen', 'Pro');
+          return;
+        }
+        state.settings.notifyOffline = e.target.checked;
+        await storageSet({ [STORAGE_KEYS.SETTINGS]: state.settings });
+      });
+    }
+
+    const notifyUpdates = document.getElementById('setting-notify-updates');
+    if (notifyUpdates) {
+      notifyUpdates.checked = Boolean(state.settings.notifyUpdates);
+      notifyUpdates.addEventListener('change', async (e) => {
+        if (!hasFeature('uptime_alerts') && e.target.checked) {
+          e.target.checked = false;
+          promptUpgrade('Update-Benachrichtigungen', 'Pro');
+          return;
+        }
+        state.settings.notifyUpdates = e.target.checked;
+        await storageSet({ [STORAGE_KEYS.SETTINGS]: state.settings });
+      });
+    }
+
+    const testNotifyBtn = document.getElementById('btn-test-notification');
+    if (testNotifyBtn) {
+      testNotifyBtn.addEventListener('click', () => {
+        chrome.runtime.sendMessage({ type: 'OWPD_TEST_NOTIFICATION' });
+        showToast('Test-Benachrichtigung ausgelöst.', 'info');
       });
     }
   }
 
-  function openSiteNoteEditor(site) {
-    const modal = document.getElementById('owpd-note-modal');
-    const title = document.getElementById('owpd-note-modal-title');
-    const textarea = document.getElementById('owpd-note-textarea');
-    const saveBtn = document.getElementById('owpd-save-note-btn');
-
-    if (!modal || !textarea || !saveBtn) return;
-    if (title) title.textContent = `Notizen: ${site.name}`;
-    textarea.value = state.notes[site.id] || '';
-    saveBtn.dataset.siteId = site.id;
-    modal.classList.add('is-open');
-  }
-
-  function renderNotesPanel() {
-    const panel = document.getElementById('owpd-notes-section');
-    if (!panel) return;
-    panel.classList.toggle('is-locked', !hasFeature('dashboard_notes'));
-  }
-
   // ---------------------------------------------------------------------------
-  // Ultimate Feature: JSON Backup & Sync
+  // Ultimate Feature: Export / Import JSON (#db-export-btn / #db-import-input)
   // ---------------------------------------------------------------------------
 
-  function bindBackupAndSync() {
-    const exportBtn = document.getElementById('owpd-export-json-btn');
-    const importBtn = document.getElementById('owpd-import-json-btn');
-    const importFile = document.getElementById('owpd-import-json-file');
+  function bindBackupControls() {
+    const exportBtn = document.getElementById('db-export-btn');
+    const importInput = document.getElementById('db-import-input');
 
     if (exportBtn) {
       exportBtn.addEventListener('click', () => {
         if (!hasFeature('json_sync')) {
-          promptUpgrade('JSON-Backup & Profil-Sync', 'Ultimate');
+          promptUpgrade('Export JSON', 'Ultimate');
           return;
         }
 
@@ -720,7 +588,6 @@
           exportedAt: new Date().toISOString(),
           sites: state.sites,
           settings: state.settings,
-          notes: state.notes,
         };
 
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -733,53 +600,154 @@
       });
     }
 
-    if (importBtn && importFile) {
-      importBtn.addEventListener('click', () => {
+    if (importInput) {
+      importInput.addEventListener('click', (e) => {
         if (!hasFeature('json_sync')) {
-          promptUpgrade('JSON-Backup & Profil-Sync', 'Ultimate');
-          return;
+          e.preventDefault();
+          promptUpgrade('Import JSON', 'Ultimate');
         }
-        importFile.click();
       });
 
-      importFile.addEventListener('change', async (e) => {
+      importInput.addEventListener('change', async (e) => {
+        if (!hasFeature('json_sync')) return;
         const file = e.target.files?.[0];
         if (!file) return;
 
         try {
-          const text = await file.text();
-          const parsed = JSON.parse(text);
-          if (!Array.isArray(parsed.sites)) {
-            throw new Error('Ungültiges Backup-Format');
-          }
+          const parsed = JSON.parse(await file.text());
+          if (!Array.isArray(parsed.sites)) throw new Error('Invalid format');
 
           state.sites = parsed.sites;
           if (parsed.settings) state.settings = { ...DEFAULT_SETTINGS, ...parsed.settings };
-          if (parsed.notes) state.notes = parsed.notes;
 
           await storageSet({
             [STORAGE_KEYS.SITES]: state.sites,
             [STORAGE_KEYS.SETTINGS]: state.settings,
-            [STORAGE_KEYS.NOTES]: state.notes,
           });
 
-          applyThemeAndSettings();
-          renderLicenseStatusUI();
-          renderTagFilters();
-          renderSitesGrid();
-          showToast('OWPD-Backup erfolgreich importiert.', 'success');
+          applyThemeAndAccent();
+          renderStats();
+          renderGrid();
+          showToast('JSON-Backup erfolgreich importiert.', 'success');
         } catch (err) {
           showToast('Import fehlgeschlagen: Ungültige JSON-Datei.', 'error');
         } finally {
-          importFile.value = '';
+          importInput.value = '';
         }
       });
     }
   }
 
   // ---------------------------------------------------------------------------
-  // Utils
+  // Rendering: Stats (#db-stats) & Grid (#db-grid)
   // ---------------------------------------------------------------------------
+
+  function renderStats() {
+    const statsEl = document.getElementById('db-stats');
+    if (!statsEl) return;
+
+    const total = state.sites.length;
+    const maxSites = getMaxSites();
+    const maxLabel = maxSites >= 9999 ? '∞' : maxSites;
+    const withUpdates = state.sites.filter((s) => (s.updatesCount || 0) > 0).length;
+    const offline = state.sites.filter((s) => s.status === 'offline' || s.status === 'error').length;
+
+    statsEl.innerHTML = `
+      <div class="db-stat-card">
+        <div class="db-stat-card__label">Installations (${escapeHtml(getLicenseState().plan_label)})</div>
+        <div class="db-stat-card__value">${total} / ${maxLabel}</div>
+      </div>
+      <div class="db-stat-card">
+        <div class="db-stat-card__label">With Updates</div>
+        <div class="db-stat-card__value">${withUpdates}</div>
+      </div>
+      <div class="db-stat-card">
+        <div class="db-stat-card__label">Offline / Errors</div>
+        <div class="db-stat-card__value">${offline}</div>
+      </div>
+    `;
+  }
+
+  function renderGrid() {
+    const grid = document.getElementById('db-grid');
+    if (!grid) return;
+
+    const canMagicLogin = hasFeature('1click_login');
+    const canBricks = hasFeature('bricks_quick_actions');
+
+    const filtered = state.sites.filter((site) => {
+      if (state.filter === 'updates' && !(site.updatesCount > 0)) return false;
+      if (state.filter === 'offline' && site.status !== 'offline' && site.status !== 'error') {
+        return false;
+      }
+      if (state.searchQuery) {
+        const hay = `${site.name} ${site.url} ${site.category || ''}`.toLowerCase();
+        if (!hay.includes(state.searchQuery)) return false;
+      }
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      grid.innerHTML = `<div style="grid-column:1/-1;opacity:0.7;padding:2rem 0;">Keine WordPress-Installationen gefunden.</div>`;
+      return;
+    }
+
+    grid.innerHTML = filtered
+      .map((site) => {
+        const statusDot =
+          site.status === 'offline' || site.status === 'error' ? '🔴' : '🟢';
+        const bricksBtn = site.isBricks
+          ? `<button type="button" class="owpd-btn owpd-btn--sm ${canBricks ? '' : 'is-locked'}" data-action="bricks" data-id="${site.id}">Bricks ${canBricks ? '' : '🔒'}</button>`
+          : '';
+
+        return `
+          <article class="db-card" data-id="${site.id}">
+            <div class="db-card__header">
+              <div>
+                <h3 class="db-card__title">${statusDot} ${escapeHtml(site.name)}</h3>
+                <a href="${escapeHtml(site.url)}" target="_blank" rel="noopener" class="db-card__url">${escapeHtml(site.url)}</a>
+              </div>
+              <button type="button" class="owpd-btn owpd-btn--sm" data-action="edit" data-id="${site.id}">✎</button>
+            </div>
+            <div class="db-card__actions" style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-top:1.2rem;">
+              <a href="${escapeHtml(site.url)}/wp-admin/" target="_blank" rel="noopener" class="owpd-btn owpd-btn--sm">WP-Admin</a>
+              <button type="button" class="owpd-btn owpd-btn--sm owpd-btn--primary ${canMagicLogin ? '' : 'is-locked'}" data-action="magic" data-id="${site.id}">
+                Magic Login ${canMagicLogin ? '' : '🔒'}
+              </button>
+              ${bricksBtn}
+            </div>
+          </article>
+        `;
+      })
+      .join('');
+
+    grid.querySelectorAll('[data-action]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const site = state.sites.find((s) => s.id === btn.dataset.id);
+        if (!site) return;
+
+        if (btn.dataset.action === 'edit') {
+          openSiteModal(site);
+        } else if (btn.dataset.action === 'magic') {
+          if (!hasFeature('1click_login')) {
+            promptUpgrade('1-Klick Magic Login', 'Pro');
+            return;
+          }
+          chrome.runtime.sendMessage({ type: 'OWPD_MAGIC_LOGIN', site }, (res) => {
+            if (chrome.runtime.lastError || !res?.ok) {
+              chrome.tabs.create({ url: `${site.url}/wp-login.php` });
+            }
+          });
+        } else if (btn.dataset.action === 'bricks') {
+          if (!hasFeature('bricks_quick_actions')) {
+            promptUpgrade('Bricks Builder Quick-Actions', 'Pro');
+            return;
+          }
+          chrome.tabs.create({ url: `${site.url}/wp-admin/edit.php?post_type=page` });
+        }
+      });
+    });
+  }
 
   function escapeHtml(str) {
     return String(str ?? '')
