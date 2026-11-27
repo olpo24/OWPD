@@ -145,7 +145,7 @@
     const openDashBtn = document.getElementById('sp-open-dashboard');
     if (openDashBtn) {
       openDashBtn.addEventListener('click', () => {
-        chrome.tabs.create({ url: chrome.runtime.getURL('html/dashboard.html') });
+        chrome.tabs.create({ url: chrome.runtime.getURL('views/dashboard.html') });
       });
     }
 
