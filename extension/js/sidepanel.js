@@ -3,14 +3,14 @@
  *
  * Project: Olpo's WordPressDock (OWPD)
  * Author:  Ole Poetter
- * Version: 0.5.3-beta
+ * Version: 0.5.10-beta
  */
 
 (() => {
   'use strict';
 
   const STORAGE_KEYS = {
-    SITES: 'owpd_sites',
+    SITES: 'sites',
     SETTINGS: 'owpd_settings',
   };
 
@@ -35,13 +35,26 @@
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // Lizenz-Helper
-  // ---------------------------------------------------------------------------
+  function t(key, fallback = '', substitutions = []) {
+    const subs = Array.isArray(substitutions)
+      ? substitutions.map((v) => String(v))
+      : [String(substitutions)];
 
-  function hasFeature(key) {
-    return window.OWPDLicense ? window.OWPDLicense.hasFeature(key) : false;
+    if (typeof chrome !== 'undefined' && chrome.i18n && typeof chrome.i18n.getMessage === 'function') {
+      const msg = chrome.i18n.getMessage(key, subs);
+      if (msg) return msg;
+    }
+
+    let out = fallback || key;
+    subs.forEach((val, idx) => {
+      out = out.replace(`$${idx + 1}`, val);
+    });
+    return out;
   }
+
+  // ---------------------------------------------------------------------------
+  // Lizenz-Helper (Free = max. 3 Instanzen, alle bestehenden Features frei)
+  // ---------------------------------------------------------------------------
 
   function canAddSite(count) {
     return window.OWPDLicense ? window.OWPDLicense.canAddSite(count) : count < 3;
@@ -67,7 +80,6 @@
     }
 
     window.addEventListener('owpd:license-changed', () => {
-      applyTheme();
       renderPlanBadge();
       renderActiveTabBox();
       renderSitesList();
@@ -88,8 +100,14 @@
       }
     });
 
-    const data = await storageGet([STORAGE_KEYS.SITES, STORAGE_KEYS.SETTINGS]);
-    state.sites = Array.isArray(data[STORAGE_KEYS.SITES]) ? data[STORAGE_KEYS.SITES] : [];
+    const data = await storageGet([STORAGE_KEYS.SITES, 'owpd_sites', STORAGE_KEYS.SETTINGS]);
+    if (Array.isArray(data[STORAGE_KEYS.SITES])) {
+      state.sites = data[STORAGE_KEYS.SITES];
+    } else if (Array.isArray(data.owpd_sites)) {
+      state.sites = data.owpd_sites;
+    } else {
+      state.sites = [];
+    }
     state.settings = { ...state.settings, ...(data[STORAGE_KEYS.SETTINGS] || {}) };
 
     applyTheme();
@@ -100,7 +118,7 @@
   });
 
   function applyTheme() {
-    const effectiveAccent = hasFeature('accent_themes') ? state.settings.accent || 'blue' : 'blue';
+    const effectiveAccent = state.settings.accent || 'blue';
     if (window.OWPDThemes && typeof window.OWPDThemes.apply === 'function') {
       window.OWPDThemes.apply({
         theme: state.settings.theme || 'system',
@@ -120,7 +138,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Header & Suche (#sp-theme-toggle, #sp-refresh-btn, #sp-open-dashboard, #sp-search)
+  // Header & Suche
   // ---------------------------------------------------------------------------
 
   function bindHeaderEvents() {
@@ -159,7 +177,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Aktiver Tab Box (#sp-active-tab-box) mit Limit-Prüfung (3 / 6 / 9999)
+  // Aktiver Tab Box (#sp-active-tab-box) mit Limit-Prüfung (3 / 6 / 9999) & 1-Click Login
   // ---------------------------------------------------------------------------
 
   async function renderActiveTabBox() {
@@ -168,22 +186,71 @@
 
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab || !tab.url || !tab.url.startsWith('http')) {
+      box.hidden = true;
       box.innerHTML = '';
       return;
     }
 
     const origin = new URL(tab.url).origin;
-    const alreadySaved = state.sites.some((s) => s.url === origin);
+    const matched = state.sites.find((s) => s.url.replace(/\/$/, '') === origin);
 
-    if (alreadySaved) {
-      box.innerHTML = '';
+    if (matched) {
+      const cleanUrl = matched.url.replace(/\/$/, '');
+      const isWpAdmin = tab.url.includes('/wp-admin');
+      const hasAutoLogin = Boolean(matched.username && matched.appPassword);
+
+      box.hidden = false;
+      box.innerHTML = `
+        <div class="sp-context">
+          <div class="sp-context__label">${escapeHtml(t('activeTabDetected', 'Active tab detected'))}</div>
+          <div class="sp-context__title">${escapeHtml(matched.name)}</div>
+          <div class="sp-context__actions">
+            ${
+              isWpAdmin
+                ? `<a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/" target="_blank">${escapeHtml(t('frontend', 'Frontend'))}</a>`
+                : hasAutoLogin
+                ? `<button type="button" class="owpd-btn owpd-btn--success owpd-btn--sm" id="sp-context-autologin" data-site-id="${matched.id}">${escapeHtml(t('oneClickLogin', '1-Click Login'))}</button>`
+                : `<a class="owpd-btn owpd-btn--primary owpd-btn--sm" href="${cleanUrl}/wp-admin/" target="_blank">WP-Admin</a>`
+            }
+            <a class="owpd-btn owpd-btn--sm" href="${cleanUrl}/wp-admin/plugins.php" target="_blank">${escapeHtml(t('plugins', 'Plugins'))}</a>
+            ${
+              matched.bricksActive
+                ? `<a class="owpd-btn owpd-btn--sm" href="${tab.url.split('?')[0]}?bricks=run" target="_blank">Bricks</a>`
+                : ''
+            }
+          </div>
+        </div>
+      `;
+
+      document.getElementById('sp-context-autologin')?.addEventListener('click', (e) => {
+        const btn = e.currentTarget;
+        const originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = t('tokenLoading', 'Token...');
+
+        chrome.runtime.sendMessage({ type: 'ONE_CLICK_LOGIN', siteId: btn.dataset.siteId }, (res) => {
+          btn.disabled = false;
+          btn.textContent = originalText;
+          if (chrome.runtime.lastError || !res?.ok) {
+            alert(
+              t(
+                'loginFailed',
+                '1-Click login failed ($1). Check OWPD Companion & Application Password.',
+                [res?.error || chrome.runtime.lastError?.message || 'Error']
+              )
+            );
+          }
+        });
+      });
       return;
     }
 
     const allowed = canAddSite(state.sites.length);
     const maxSites = getMaxSites();
     const lic = getLicenseState();
+    const nextPlan = lic.plan === 'free' ? 'Pro' : 'Ultimate';
 
+    box.hidden = false;
     box.innerHTML = `
       <div class="sp-active-tab-banner" style="padding:0.8rem 1rem;margin:0 1rem 0.8rem;border-radius:0.8rem;background:rgba(148,163,184,0.12);display:flex;justify-content:space-between;align-items:center;gap:0.8rem;">
         <span style="font-size:1.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(origin.replace(/^https?:\/\//, ''))}</span>
@@ -198,7 +265,11 @@
       quickAddBtn.addEventListener('click', async () => {
         if (!canAddSite(state.sites.length)) {
           alert(
-            `Limit (${state.sites.length}/${maxSites}) im ${lic.plan_label}-Tarif erreicht. Öffne das Dashboard → Settings für ein Upgrade.`
+            t(
+              'licenseLimitReachedToast',
+              'Limit reached ($1/$2). Upgrade to OWPD $3 to add more sites.',
+              [state.sites.length, maxSites, nextPlan]
+            )
           );
           return;
         }
@@ -216,7 +287,7 @@
         });
 
         await storageSet({ [STORAGE_KEYS.SITES]: state.sites });
-        renderActiveTabBox();
+        await renderActiveTabBox();
         renderSitesList();
       });
     }
@@ -230,9 +301,6 @@
     const list = document.getElementById('sp-sites-list');
     if (!list) return;
 
-    const canMagicLogin = hasFeature('1click_login');
-    const canBricks = hasFeature('bricks_quick_actions');
-
     const filtered = state.sites.filter((site) => {
       if (!state.searchQuery) return true;
       const hay = `${site.name} ${site.url} ${site.category || ''}`.toLowerCase();
@@ -240,28 +308,31 @@
     });
 
     if (filtered.length === 0) {
-      list.innerHTML = `<div style="padding:2rem 1.2rem;text-align:center;opacity:0.7;font-size:1.3rem;">Keine Instanzen gefunden.</div>`;
+      list.innerHTML = `<div style="padding:2rem 1.2rem;text-align:center;opacity:0.7;font-size:1.3rem;">${escapeHtml(t('emptyDock', 'No WordPress sites in your dock yet.'))}</div>`;
       return;
     }
 
     list.innerHTML = filtered
       .map((site) => {
-        const bricksBtn = site.isBricks
-          ? `<button type="button" class="owpd-btn owpd-btn--sm ${canBricks ? '' : 'is-locked'}" data-action="bricks" data-id="${site.id}">Bricks ${canBricks ? '' : '🔒'}</button>`
+        const cleanUrl = site.url.replace(/\/$/, '');
+        const hasAutoLogin = Boolean(site.username && site.appPassword);
+        const bricksBtn = site.bricksActive
+          ? `<a href="${cleanUrl}/?bricks=run" target="_blank" rel="noopener" class="owpd-btn owpd-btn--sm">Bricks</a>`
           : '';
 
         return `
           <div class="sp-site-card" data-id="${site.id}">
             <div class="sp-site-card__info">
               <div class="sp-site-card__title">${escapeHtml(site.name)}</div>
-              <div class="sp-site-card__url">${escapeHtml(site.url.replace(/^https?:\/\//, ''))}</div>
+              <div class="sp-site-card__url">${escapeHtml(cleanUrl.replace(/^https?:\/\//, ''))}</div>
             </div>
             <div class="sp-site-card__actions">
-              <button type="button" class="owpd-btn owpd-btn--sm" data-action="frontend" data-id="${site.id}" title="Frontend">↗</button>
-              <button type="button" class="owpd-btn owpd-btn--sm" data-action="admin" data-id="${site.id}" title="WP-Admin">WP</button>
-              <button type="button" class="owpd-btn owpd-btn--sm owpd-btn--primary ${canMagicLogin ? '' : 'is-locked'}" data-action="magic" data-id="${site.id}">
-                Login ${canMagicLogin ? '' : '🔒'}
-              </button>
+              <a href="${cleanUrl}/" target="_blank" rel="noopener" class="owpd-btn owpd-btn--sm" title="Frontend">↗</a>
+              ${
+                hasAutoLogin
+                  ? `<button type="button" class="owpd-btn owpd-btn--sm owpd-btn--success" data-action="autologin" data-id="${site.id}">${escapeHtml(t('loginShort', 'Login'))}</button>`
+                  : `<a href="${cleanUrl}/wp-admin/" target="_blank" rel="noopener" class="owpd-btn owpd-btn--sm">${escapeHtml(t('adminShort', 'Admin'))}</a>`
+              }
               ${bricksBtn}
             </div>
           </div>
@@ -269,32 +340,26 @@
       })
       .join('');
 
-    list.querySelectorAll('[data-action]').forEach((btn) => {
+    list.querySelectorAll('[data-action="autologin"]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const site = state.sites.find((s) => s.id === btn.dataset.id);
-        if (!site) return;
+        const siteId = btn.dataset.id;
+        const origText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = t('tokenLoading', 'Token...');
 
-        if (btn.dataset.action === 'frontend') {
-          chrome.tabs.create({ url: site.url });
-        } else if (btn.dataset.action === 'admin') {
-          chrome.tabs.create({ url: `${site.url}/wp-admin/` });
-        } else if (btn.dataset.action === 'bricks') {
-          if (!hasFeature('bricks_quick_actions')) {
-            alert('Bricks Quick-Actions sind ab OWPD Pro verfügbar.');
-            return;
+        chrome.runtime.sendMessage({ type: 'ONE_CLICK_LOGIN', siteId }, (res) => {
+          btn.disabled = false;
+          btn.textContent = origText;
+          if (chrome.runtime.lastError || !res?.ok) {
+            alert(
+              t(
+                'loginFailed',
+                '1-Click login failed ($1). Check OWPD Companion & Application Password.',
+                [res?.error || chrome.runtime.lastError?.message || 'Error']
+              )
+            );
           }
-          chrome.tabs.create({ url: `${site.url}/wp-admin/edit.php?post_type=page` });
-        } else if (btn.dataset.action === 'magic') {
-          if (!hasFeature('1click_login')) {
-            alert('1-Klick Magic Login ist ab OWPD Pro verfügbar.');
-            return;
-          }
-          chrome.runtime.sendMessage({ type: 'OWPD_MAGIC_LOGIN', site }, (res) => {
-            if (chrome.runtime.lastError || !res?.ok) {
-              chrome.tabs.create({ url: `${site.url}/wp-login.php` });
-            }
-          });
-        }
+        });
       });
     });
   }
