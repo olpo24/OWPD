@@ -3,7 +3,7 @@
  *
  * Project: Olpo's WordPressDock (OWPD)
  * Author:  Ole Poetter
- * Version: 0.5.3-beta
+ * Version: 0.5.10-beta
  */
 
 (() => {
@@ -30,7 +30,7 @@
   };
 
   // ---------------------------------------------------------------------------
-  // Storage & Runtime Helpers
+  // Storage & i18n Helpers
   // ---------------------------------------------------------------------------
 
   function storageGet(keys) {
@@ -45,12 +45,25 @@
     });
   }
 
-  function t(key, fallback) {
-    if (window.OWPDI18n && typeof window.OWPDI18n.t === 'function') {
-      const val = window.OWPDI18n.t(key);
-      if (val && val !== key) return val;
+  /**
+   * Liest Texte über chrome.i18n.getMessage() inkl. $1/$2/$3-Substitutions aus.
+   */
+  function t(key, fallback = '', substitutions = []) {
+    const subs = Array.isArray(substitutions)
+      ? substitutions.map((v) => String(v))
+      : [String(substitutions)];
+
+    if (typeof chrome !== 'undefined' && chrome.i18n && typeof chrome.i18n.getMessage === 'function') {
+      const msg = chrome.i18n.getMessage(key, subs);
+      if (msg) return msg;
     }
-    return fallback;
+
+    // Fallback-Ersetzung, falls die Extension ohne _locales geladen wurde
+    let out = fallback || key;
+    subs.forEach((val, idx) => {
+      out = out.replace(`$${idx + 1}`, val);
+    });
+    return out;
   }
 
   // ---------------------------------------------------------------------------
@@ -95,10 +108,12 @@
   }
 
   function promptUpgrade(featureLabel, requiredPlan = 'Pro') {
-    showToast(
-      `„${featureLabel}“ ist ab OWPD ${requiredPlan} verfügbar. Aktiviere deine Lizenz unter Settings.`,
-      'info'
+    const suffix = t(
+      'licenseUpgradePrompt',
+      'is available starting with OWPD $1. Activate your license under Settings.',
+      [requiredPlan]
     );
+    showToast(`„${featureLabel}“ ${suffix}`, 'info');
     switchView('settings');
   }
 
@@ -177,7 +192,7 @@
     const accentGrid = document.getElementById('settings-accent-grid');
     if (accentGrid) {
       accentGrid.classList.toggle('is-locked', !canCustomAccent);
-      accentGrid.title = canCustomAccent ? '' : 'Pro-Feature: Eigene Akzentfarben';
+      accentGrid.title = canCustomAccent ? '' : t('settingsAccentColor', 'Primary Accent Color');
     }
   }
 
@@ -206,24 +221,30 @@
 
     if (statusBox) {
       if (lic.valid) {
-        const maxLabel = maxSites >= 9999 ? 'Unbegrenzt' : `${maxSites} Instanzen`;
+        const maxLabel =
+          maxSites >= 9999
+            ? t('licenseUnlimited', 'Unlimited')
+            : `${maxSites} ${t('licenseSitesUnit', 'sites')}`;
         const expiryText = lic.expires_at
-          ? `Aktiv bis: ${lic.expires_at} (monatliche Ko-fi Membership)`
-          : 'Unbegrenzte Lizenz';
+          ? `${t('licenseActiveUntil', 'Active until')}: ${lic.expires_at} (${t('licenseMonthlySub', 'monthly Ko-fi Membership')})`
+          : t('licenseLifetime', 'Unlimited license');
+
         statusBox.innerHTML = `
           <div style="padding:1rem 1.2rem;border-radius:0.8rem;background:rgba(22,163,74,0.12);border:1px solid rgba(22,163,74,0.35);font-size:1.3rem;">
-            <strong>● Aktiv: OWPD ${escapeHtml(lic.plan_label)}</strong><br>
+            <strong>${escapeHtml(t('licenseActivePrefix', '● Active: OWPD'))} ${escapeHtml(lic.plan_label)}</strong><br>
             <span style="opacity:0.85;font-size:1.2rem;">
-              Limit: ${maxLabel} · Geräte: ${lic.used_activations} / ${lic.max_activations} · ${escapeHtml(expiryText)}
+              ${escapeHtml(t('licenseLimitLabel', 'Site limit'))}: ${escapeHtml(maxLabel)} ·
+              ${escapeHtml(t('licenseDevicesLabel', 'Devices'))}: ${lic.used_activations} / ${lic.max_activations} ·
+              ${escapeHtml(expiryText)}
             </span>
           </div>
         `;
       } else {
         statusBox.innerHTML = `
           <div style="padding:1rem 1.2rem;border-radius:0.8rem;background:rgba(148,163,184,0.12);border:1px solid rgba(148,163,184,0.25);font-size:1.3rem;">
-            <strong>Tarif: OWPD Free (max. 3 Instanzen)</strong><br>
+            <strong>${escapeHtml(t('licenseFreeTitle', 'Plan: OWPD Free (max. 3 sites)'))}</strong><br>
             <span style="opacity:0.85;font-size:1.2rem;">
-              Schalte mit einer monatlichen Ko-fi Membership Pro (6 Instanzen, Magic Login &amp; Bricks-Actions) oder Ultimate (Unbegrenzt, JSON-Sync &amp; Notizen) frei.
+              ${escapeHtml(t('licenseFreeDesc', 'Unlock Pro (6 sites, Magic Login & Bricks Actions) or Ultimate (Unlimited sites, JSON Sync & Notes) with a monthly Ko-fi Membership.'))}
             </span>
           </div>
         `;
@@ -240,11 +261,11 @@
 
     if (exportBtn) {
       exportBtn.classList.toggle('is-locked', !canSync);
-      exportBtn.title = canSync ? '' : 'Ultimate-Feature: JSON Export';
+      exportBtn.title = canSync ? '' : t('exportJson', 'Export JSON');
     }
     if (importLabel) {
       importLabel.classList.toggle('is-locked', !canSync);
-      importLabel.title = canSync ? '' : 'Ultimate-Feature: JSON Import';
+      importLabel.title = canSync ? '' : t('importJson', 'Import JSON');
     }
 
     const notesField = document.getElementById('field-notes');
@@ -252,8 +273,8 @@
       const canNotes = hasFeature('dashboard_notes');
       notesField.disabled = !canNotes;
       notesField.placeholder = canNotes
-        ? t('placeholderNotes', 'Notes...')
-        : 'Ultimate-Feature: Instanz-Notizen';
+        ? t('placeholderNotes', 'e.g. Netcup Webhosting, Bricks Builder + MetaBox')
+        : 'Ultimate: ' + t('labelNotes', 'Notes');
     }
   }
 
@@ -276,10 +297,13 @@
         activateBtn.textContent = orig;
 
         if (res.ok) {
-          showToast(`OWPD ${res.state.plan_label} aktiviert!`, 'success');
+          showToast(
+            t('licenseActivatedToast', 'OWPD $1 activated!', [res.state.plan_label]),
+            'success'
+          );
           renderLicenseUI();
         } else {
-          showToast(res.message || 'Lizenzschlüssel ungültig.', 'error');
+          showToast(res.message || 'Invalid license key.', 'error');
         }
       });
     }
@@ -292,9 +316,12 @@
         revalidateBtn.disabled = false;
 
         if (res.ok) {
-          showToast('Lizenzstatus erfolgreich aktualisiert.', 'success');
+          showToast(
+            t('licenseRefreshedToast', 'License status successfully refreshed.'),
+            'success'
+          );
         } else {
-          showToast(res.message || 'Lizenz nicht mehr aktiv.', 'error');
+          showToast(res.message || 'License inactive.', 'error');
         }
         renderLicenseUI();
       });
@@ -305,7 +332,10 @@
         if (!window.OWPDLicense) return;
         await window.OWPDLicense.deactivateLocal();
         if (keyInput) keyInput.value = '';
-        showToast('Lizenz auf diesem Gerät entfernt (Free-Modus).', 'info');
+        showToast(
+          t('licenseRemovedToast', 'License removed from this device (Free mode).'),
+          'info'
+        );
         renderLicenseUI();
       });
     }
@@ -373,9 +403,13 @@
       addBtn.addEventListener('click', () => {
         if (!canAddSite(state.sites.length)) {
           const lic = getLicenseState();
-          const nextPlan = lic.plan === 'free' ? 'Pro (6 Instanzen)' : 'Ultimate (Unbegrenzt)';
+          const nextPlan = lic.plan === 'free' ? 'Pro' : 'Ultimate';
           showToast(
-            `Limit erreicht (${state.sites.length}/${getMaxSites()}). Upgrade auf OWPD ${nextPlan} für weitere Sites.`,
+            t(
+              'licenseLimitReachedToast',
+              'Limit reached ($1/$2). Upgrade to OWPD $3 to add more sites.',
+              [state.sites.length, getMaxSites(), nextPlan]
+            ),
             'error'
           );
           switchView('settings');
@@ -389,7 +423,7 @@
     if (checkAllBtn) {
       checkAllBtn.addEventListener('click', () => {
         chrome.runtime.sendMessage({ type: 'OWPD_CHECK_ALL_SITES' }, () => {
-          showToast('Statusprüfung für alle Instanzen gestartet.', 'info');
+          showToast(t('checkingAll', 'Checking all...'), 'info');
         });
       });
     }
@@ -410,7 +444,16 @@
 
         const id = document.getElementById('field-id').value;
         if (!id && !canAddSite(state.sites.length)) {
-          showToast(`Maximales Limit (${getMaxSites()} Instanzen) erreicht.`, 'error');
+          const lic = getLicenseState();
+          const nextPlan = lic.plan === 'free' ? 'Pro' : 'Ultimate';
+          showToast(
+            t(
+              'licenseLimitReachedToast',
+              'Limit reached ($1/$2). Upgrade to OWPD $3 to add more sites.',
+              [state.sites.length, getMaxSites(), nextPlan]
+            ),
+            'error'
+          );
           return;
         }
 
@@ -443,7 +486,7 @@
         if (backdrop) backdrop.classList.remove('is-open');
         renderStats();
         renderGrid();
-        showToast('Installation gespeichert.', 'success');
+        showToast(t('save', 'Saved'), 'success');
       });
     }
 
@@ -457,7 +500,7 @@
         if (backdrop) backdrop.classList.remove('is-open');
         renderStats();
         renderGrid();
-        showToast('Installation gelöscht.', 'info');
+        showToast(t('deleteSite', 'Delete installation'), 'info');
       });
     }
 
@@ -467,7 +510,7 @@
         const id = document.getElementById('field-id').value;
         if (!id) return;
         chrome.runtime.sendMessage({ type: 'OWPD_CHECK_SITE', siteId: id }, () => {
-          showToast('Status wird geprüft...', 'info');
+          showToast(t('testingStatus', 'Checking...'), 'info');
         });
       });
     }
@@ -479,7 +522,7 @@
 
     document.getElementById('modal-title').textContent = site
       ? site.name
-      : t('addNewSite', '+ New WordPress Site');
+      : t('modalNewSite', 'New WordPress Installation');
     document.getElementById('field-id').value = site ? site.id : '';
     document.getElementById('field-name').value = site ? site.name || '' : '';
     document.getElementById('field-category').value = site ? site.category || '' : '';
@@ -521,7 +564,7 @@
         if (!swatch) return;
 
         if (!hasFeature('accent_themes')) {
-          promptUpgrade('Primary Accent Color', 'Pro');
+          promptUpgrade(t('settingsAccentColor', 'Primary Accent Color'), 'Pro');
           return;
         }
 
@@ -537,7 +580,7 @@
       notifyOffline.addEventListener('change', async (e) => {
         if (!hasFeature('uptime_alerts') && e.target.checked) {
           e.target.checked = false;
-          promptUpgrade('Offline-Benachrichtigungen', 'Pro');
+          promptUpgrade(t('notifyOfflineLabel', 'Alert when a site goes offline'), 'Pro');
           return;
         }
         state.settings.notifyOffline = e.target.checked;
@@ -551,7 +594,7 @@
       notifyUpdates.addEventListener('change', async (e) => {
         if (!hasFeature('uptime_alerts') && e.target.checked) {
           e.target.checked = false;
-          promptUpgrade('Update-Benachrichtigungen', 'Pro');
+          promptUpgrade(t('notifyUpdatesLabel', 'Alert on new available updates'), 'Pro');
           return;
         }
         state.settings.notifyUpdates = e.target.checked;
@@ -563,7 +606,7 @@
     if (testNotifyBtn) {
       testNotifyBtn.addEventListener('click', () => {
         chrome.runtime.sendMessage({ type: 'OWPD_TEST_NOTIFICATION' });
-        showToast('Test-Benachrichtigung ausgelöst.', 'info');
+        showToast(t('testNotificationBtn', 'Send test notification'), 'info');
       });
     }
   }
@@ -579,7 +622,7 @@
     if (exportBtn) {
       exportBtn.addEventListener('click', () => {
         if (!hasFeature('json_sync')) {
-          promptUpgrade('Export JSON', 'Ultimate');
+          promptUpgrade(t('exportJson', 'Export JSON'), 'Ultimate');
           return;
         }
 
@@ -604,7 +647,7 @@
       importInput.addEventListener('click', (e) => {
         if (!hasFeature('json_sync')) {
           e.preventDefault();
-          promptUpgrade('Import JSON', 'Ultimate');
+          promptUpgrade(t('importJson', 'Import JSON'), 'Ultimate');
         }
       });
 
@@ -615,7 +658,9 @@
 
         try {
           const parsed = JSON.parse(await file.text());
-          if (!Array.isArray(parsed.sites)) throw new Error('Invalid format');
+          if (!Array.isArray(parsed.sites)) {
+            throw new Error(t('invalidFormat', 'Invalid JSON format'));
+          }
 
           state.sites = parsed.sites;
           if (parsed.settings) state.settings = { ...DEFAULT_SETTINGS, ...parsed.settings };
@@ -628,9 +673,15 @@
           applyThemeAndAccent();
           renderStats();
           renderGrid();
-          showToast('JSON-Backup erfolgreich importiert.', 'success');
+          showToast(
+            t('importSuccess', '$1 installations imported.', [state.sites.length]),
+            'success'
+          );
         } catch (err) {
-          showToast('Import fehlgeschlagen: Ungültige JSON-Datei.', 'error');
+          showToast(
+            t('importFailed', 'Import failed: $1', [err.message || 'Invalid JSON']),
+            'error'
+          );
         } finally {
           importInput.value = '';
         }
@@ -654,15 +705,15 @@
 
     statsEl.innerHTML = `
       <div class="db-stat-card">
-        <div class="db-stat-card__label">Installations (${escapeHtml(getLicenseState().plan_label)})</div>
+        <div class="db-stat-card__label">${escapeHtml(t('statTotal', 'Total Installations'))} (${escapeHtml(getLicenseState().plan_label)})</div>
         <div class="db-stat-card__value">${total} / ${maxLabel}</div>
       </div>
       <div class="db-stat-card">
-        <div class="db-stat-card__label">With Updates</div>
+        <div class="db-stat-card__label">${escapeHtml(t('statUpdates', 'Pending Updates'))}</div>
         <div class="db-stat-card__value">${withUpdates}</div>
       </div>
       <div class="db-stat-card">
-        <div class="db-stat-card__label">Offline / Errors</div>
+        <div class="db-stat-card__label">${escapeHtml(t('navOffline', 'Offline / Errors'))}</div>
         <div class="db-stat-card__value">${offline}</div>
       </div>
     `;
@@ -688,7 +739,7 @@
     });
 
     if (filtered.length === 0) {
-      grid.innerHTML = `<div style="grid-column:1/-1;opacity:0.7;padding:2rem 0;">Keine WordPress-Installationen gefunden.</div>`;
+      grid.innerHTML = `<div style="grid-column:1/-1;opacity:0.7;padding:2rem 0;">${escapeHtml(t('noMatchingSites', 'No matching installations found.'))}</div>`;
       return;
     }
 
@@ -697,7 +748,7 @@
         const statusDot =
           site.status === 'offline' || site.status === 'error' ? '🔴' : '🟢';
         const bricksBtn = site.isBricks
-          ? `<button type="button" class="owpd-btn owpd-btn--sm ${canBricks ? '' : 'is-locked'}" data-action="bricks" data-id="${site.id}">Bricks ${canBricks ? '' : '🔒'}</button>`
+          ? `<button type="button" class="owpd-btn owpd-btn--sm ${canBricks ? '' : 'is-locked'}" data-action="bricks" data-id="${site.id}">${escapeHtml(t('bricksEditor', 'Bricks Editor'))} ${canBricks ? '' : '🔒'}</button>`
           : '';
 
         return `
@@ -710,9 +761,9 @@
               <button type="button" class="owpd-btn owpd-btn--sm" data-action="edit" data-id="${site.id}">✎</button>
             </div>
             <div class="db-card__actions" style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-top:1.2rem;">
-              <a href="${escapeHtml(site.url)}/wp-admin/" target="_blank" rel="noopener" class="owpd-btn owpd-btn--sm">WP-Admin</a>
+              <a href="${escapeHtml(site.url)}/wp-admin/" target="_blank" rel="noopener" class="owpd-btn owpd-btn--sm">${escapeHtml(t('adminShort', 'Admin'))}</a>
               <button type="button" class="owpd-btn owpd-btn--sm owpd-btn--primary ${canMagicLogin ? '' : 'is-locked'}" data-action="magic" data-id="${site.id}">
-                Magic Login ${canMagicLogin ? '' : '🔒'}
+                ${escapeHtml(t('oneClickLogin', '1-Click Login'))} ${canMagicLogin ? '' : '🔒'}
               </button>
               ${bricksBtn}
             </div>
@@ -730,7 +781,7 @@
           openSiteModal(site);
         } else if (btn.dataset.action === 'magic') {
           if (!hasFeature('1click_login')) {
-            promptUpgrade('1-Klick Magic Login', 'Pro');
+            promptUpgrade(t('oneClickLogin', '1-Click Login'), 'Pro');
             return;
           }
           chrome.runtime.sendMessage({ type: 'OWPD_MAGIC_LOGIN', site }, (res) => {
@@ -740,7 +791,7 @@
           });
         } else if (btn.dataset.action === 'bricks') {
           if (!hasFeature('bricks_quick_actions')) {
-            promptUpgrade('Bricks Builder Quick-Actions', 'Pro');
+            promptUpgrade(t('bricksEditor', 'Bricks Editor'), 'Pro');
             return;
           }
           chrome.tabs.create({ url: `${site.url}/wp-admin/edit.php?post_type=page` });
