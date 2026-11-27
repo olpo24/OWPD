@@ -13,9 +13,8 @@
   const STORAGE_KEY_STATE = 'owpd_license_state';
   const STORAGE_KEY_INSTANCE = 'owpd_instance_id';
 
-  // Prüfintervalle & Offline-Toleranz
-  const REVALIDATE_INTERVAL_MS = 12 * 60 * 60 * 1000; // Alle 12 Stunden neu prüfen
-  const OFFLINE_GRACE_PERIOD_MS = 72 * 60 * 60 * 1000; // 72 Stunden Offline-Puffer
+  const REVALIDATE_INTERVAL_MS = 12 * 60 * 60 * 1000;
+  const OFFLINE_GRACE_PERIOD_MS = 72 * 60 * 60 * 1000;
 
   // Instanz-Limits pro Tarif: Free = 3 | Pro = 6 | Ultimate = 9999
   const TIER_SITE_LIMITS = Object.freeze({
@@ -24,7 +23,6 @@
     ultimate: 9999,
   });
 
-  // Standard-Konfiguration für die kostenlose Basis-Version
   const FREE_TIER_CONFIG = Object.freeze({
     plan: 'free',
     plan_label: 'Free',
@@ -32,7 +30,6 @@
     features: [],
   });
 
-  // Alle bekannten Feature-Flags und ihr benötigtes Mindest-Paket (für UI-Badges)
   const FEATURE_CATALOG = Object.freeze({
     '1click_login': { label: '1-Klick Magic Login', minPlan: 'pro' },
     'bricks_quick_actions': { label: 'Bricks Builder Quick-Actions', minPlan: 'pro' },
