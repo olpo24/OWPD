@@ -9,16 +9,11 @@
 (() => {
   'use strict';
 
-  const STORAGE_KEYS = {
-    SITES: 'sites',
-    SETTINGS: 'owpd_settings',
-  };
-
   let state = {
     sites: [],
-    settings: {
+    prefs: {
       theme: 'system',
-      accent: 'blue',
+      accentColor: 'carbon-orange',
     },
     searchQuery: '',
   };
@@ -52,10 +47,6 @@
     return out;
   }
 
-  // ---------------------------------------------------------------------------
-  // Lizenz-Helper (Free = max. 3 Instanzen, alle bestehenden Features frei)
-  // ---------------------------------------------------------------------------
-
   function canAddSite(count) {
     return window.OWPDLicense ? window.OWPDLicense.canAddSite(count) : count < 3;
   }
@@ -87,28 +78,24 @@
 
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== 'local') return;
-      if (changes[STORAGE_KEYS.SITES]) {
-        state.sites = Array.isArray(changes[STORAGE_KEYS.SITES].newValue)
-          ? changes[STORAGE_KEYS.SITES].newValue
-          : [];
+      if (changes.sites) {
+        state.sites = Array.isArray(changes.sites.newValue) ? changes.sites.newValue : [];
         renderActiveTabBox();
         renderSitesList();
       }
-      if (changes[STORAGE_KEYS.SETTINGS]) {
-        state.settings = { ...state.settings, ...(changes[STORAGE_KEYS.SETTINGS].newValue || {}) };
+      if (changes.theme || changes.accentColor) {
+        if (changes.theme) state.prefs.theme = changes.theme.newValue || 'system';
+        if (changes.accentColor) state.prefs.accentColor = changes.accentColor.newValue || 'carbon-orange';
         applyTheme();
       }
     });
 
-    const data = await storageGet([STORAGE_KEYS.SITES, 'owpd_sites', STORAGE_KEYS.SETTINGS]);
-    if (Array.isArray(data[STORAGE_KEYS.SITES])) {
-      state.sites = data[STORAGE_KEYS.SITES];
-    } else if (Array.isArray(data.owpd_sites)) {
-      state.sites = data.owpd_sites;
-    } else {
-      state.sites = [];
-    }
-    state.settings = { ...state.settings, ...(data[STORAGE_KEYS.SETTINGS] || {}) };
+    const data = await storageGet(['sites', 'theme', 'accentColor']);
+    state.sites = Array.isArray(data.sites) ? data.sites : [];
+    state.prefs = {
+      theme: data.theme || 'system',
+      accentColor: data.accentColor || 'carbon-orange',
+    };
 
     applyTheme();
     bindHeaderEvents();
@@ -118,15 +105,14 @@
   });
 
   function applyTheme() {
-    const effectiveAccent = state.settings.accent || 'blue';
     if (window.OWPDThemes && typeof window.OWPDThemes.apply === 'function') {
       window.OWPDThemes.apply({
-        theme: state.settings.theme || 'system',
-        accent: effectiveAccent,
+        theme: state.prefs.theme,
+        accent: state.prefs.accentColor,
       });
     } else {
-      document.documentElement.dataset.theme = state.settings.theme || 'system';
-      document.documentElement.dataset.accent = effectiveAccent;
+      document.documentElement.dataset.theme = state.prefs.theme;
+      document.documentElement.dataset.accent = state.prefs.accentColor;
     }
   }
 
@@ -146,9 +132,9 @@
     if (themeBtn) {
       themeBtn.addEventListener('click', async () => {
         const order = ['system', 'light', 'dark'];
-        const next = order[(order.indexOf(state.settings.theme) + 1) % order.length];
-        state.settings.theme = next;
-        await storageSet({ [STORAGE_KEYS.SETTINGS]: state.settings });
+        const next = order[(order.indexOf(state.prefs.theme) + 1) % order.length];
+        state.prefs.theme = next;
+        await storageSet({ theme: next });
         applyTheme();
       });
     }
@@ -156,7 +142,7 @@
     const refreshBtn = document.getElementById('sp-refresh-btn');
     if (refreshBtn) {
       refreshBtn.addEventListener('click', () => {
-        chrome.runtime.sendMessage({ type: 'OWPD_CHECK_ALL_SITES' });
+        chrome.runtime.sendMessage({ type: 'CHECK_ALL_SITES' });
       });
     }
 
@@ -286,7 +272,7 @@
           updatedAt: Date.now(),
         });
 
-        await storageSet({ [STORAGE_KEYS.SITES]: state.sites });
+        await storageSet({ sites: state.sites });
         await renderActiveTabBox();
         renderSitesList();
       });
