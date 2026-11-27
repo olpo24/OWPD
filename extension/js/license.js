@@ -1,9 +1,13 @@
 /**
  * OWPD License & Feature Gate Manager
  *
+ * Free:     3 sites + all existing core features (1-Click Login, Updates, Accent Colors, JSON, Notes)
+ * Pro:      6 sites + all future Pro features (hasPro() === true)
+ * Ultimate: 9999 sites + identical Pro feature set (hasPro() === true)
+ *
  * Project: Olpo's WordPressDock (OWPD)
  * Author:  Ole Poetter
- * Version: 0.5.3-beta
+ * Version: 0.5.10-beta
  */
 
 (() => {
@@ -13,10 +17,10 @@
   const STORAGE_KEY_STATE = 'owpd_license_state';
   const STORAGE_KEY_INSTANCE = 'owpd_instance_id';
 
-  const REVALIDATE_INTERVAL_MS = 12 * 60 * 60 * 1000;
-  const OFFLINE_GRACE_PERIOD_MS = 72 * 60 * 60 * 1000;
+  const REVALIDATE_INTERVAL_MS = 12 * 60 * 60 * 1000; // Alle 12 Stunden neu prüfen
+  const OFFLINE_GRACE_PERIOD_MS = 72 * 60 * 60 * 1000; // 72 Stunden Offline-Puffer
 
-  // Instanz-Limits pro Tarif: Free = 3 | Pro = 6 | Ultimate = 9999
+  // Instanz-Limits pro Tarif
   const TIER_SITE_LIMITS = Object.freeze({
     free: 3,
     pro: 6,
@@ -28,16 +32,6 @@
     plan_label: 'Free',
     max_sites: TIER_SITE_LIMITS.free,
     features: [],
-  });
-
-  const FEATURE_CATALOG = Object.freeze({
-    '1click_login': { label: '1-Klick Magic Login', minPlan: 'pro' },
-    'bricks_quick_actions': { label: 'Bricks Builder Quick-Actions', minPlan: 'pro' },
-    'accent_themes': { label: 'Eigene Akzentfarben & Themes', minPlan: 'pro' },
-    'uptime_alerts': { label: 'Uptime- & Update-Benachrichtigungen', minPlan: 'pro' },
-    'json_sync': { label: 'JSON-Backup & Profil-Sync', minPlan: 'ultimate' },
-    'unlimited_sites': { label: 'Unbegrenzte WordPress-Instanzen', minPlan: 'ultimate' },
-    'dashboard_notes': { label: 'Instanz-Notizen & Checklisten', minPlan: 'ultimate' },
   });
 
   const ERROR_MESSAGES_DE = Object.freeze({
@@ -173,39 +167,47 @@
       return { ...this._state };
     }
 
+    /**
+     * Gibt den aktuellen Tarif zurück: 'free' | 'pro' | 'ultimate'.
+     */
     getPlan() {
       return this._state.valid ? this._state.plan : 'free';
     }
 
-    hasFeature(featureKey) {
-      if (!this._state.valid) {
-        return false;
-      }
-      if (this._state.plan === 'ultimate') {
-        return true;
-      }
-      return Array.isArray(this._state.features) && this._state.features.includes(featureKey);
+    /**
+     * Zentrale Prüfung für alle zukünftigen Pro-Features.
+     * Pro und Ultimate besitzen exakt denselben Funktionsumfang.
+     */
+    hasPro() {
+      return Boolean(
+        this._state.valid && (this._state.plan === 'pro' || this._state.plan === 'ultimate')
+      );
     }
 
+    /**
+     * Alias für zukünftige Feature-Flags (Pro & Ultimate schalten alles frei).
+     */
+    hasFeature(featureKey) {
+      if (!featureKey) return this.hasPro();
+      return this.hasPro();
+    }
+
+    /**
+     * Prüft, ob eine weitere WordPress-Instanz angelegt werden darf.
+     */
     canAddSite(currentSiteCount) {
       return currentSiteCount < this.getMaxSites();
     }
 
+    /**
+     * Gibt das maximale Instanz-Limit zurück (Free: 3, Pro: 6, Ultimate: 9999).
+     */
     getMaxSites() {
       if (!this._state.valid) {
         return TIER_SITE_LIMITS.free;
       }
       const planFallback = TIER_SITE_LIMITS[this._state.plan] || TIER_SITE_LIMITS.pro;
       return Number(this._state.max_sites || planFallback);
-    }
-
-    getFeatureInfo(featureKey) {
-      return (
-        FEATURE_CATALOG[featureKey] || {
-          label: featureKey,
-          minPlan: 'pro',
-        }
-      );
     }
 
     async activate(rawKey) {
@@ -286,9 +288,9 @@
           valid: true,
           license_key: licenseKey,
           plan,
-          plan_label: data.plan_label || 'Pro',
+          plan_label: data.plan_label || (plan === 'ultimate' ? 'Ultimate' : 'Pro'),
           max_sites: Number(data.max_sites || defaultLimit),
-          features: Array.isArray(data.features) ? data.features : [],
+          features: Array.isArray(data.features) ? data.features : ['pro_features'],
           max_activations: Number(data.max_activations || 3),
           used_activations: Number(data.used_activations || 1),
           expires_at: data.expires_at || null,
