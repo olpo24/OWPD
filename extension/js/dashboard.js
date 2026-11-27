@@ -3,7 +3,7 @@
  *
  * Project: Olpo's WordPressDock (OWPD)
  * Author:  Ole Poetter
- * Version: 0.5.10-beta
+ * Version: 0.5.4-beta
  */
 
 (() => {

@@ -1,5 +1,37 @@
 [
   {
+    "version": "0.5.4-beta",
+    "date": "2026-11-27",
+    "prerelease": true,
+    "changes": {
+      "added": [],
+      "improved": [
+        "Refactor messages.json to clean up structure",
+        "Refactor messages.json by removing redundant object",
+        "Refactor state management for sites and settings",
+        "Update dashboard.js",
+        "Fix missing newline at end of background.js",
+        "Revise licenseFreeDesc for clarity on membership",
+        "Fix JSON formatting in messages.json",
+        "Update licenseFreeDesc message for clarity",
+        "Update version and improve site handling in sidepanel",
+        "Refactor dashboard.js for improved state management",
+        "Refactor dashboard.js for improved functionality",
+        "Update version and author information in sidepanel.html",
+        "Update dashboard.html with i18n attributes",
+        "Update background.js",
+        "Update license.js",
+        "Update dashboard.js",
+        "Add German localization for license settings",
+        "Update messages.json",
+        "Change dashboard URL to use 'views' directory",
+        "Fix import path for license.js in background.js",
+        "Update import path for license.js in background.js"
+      ],
+      "fixed": []
+    }
+  },
+  {
     "version": "0.5.3-beta",
     "date": "2026-11-27",
     "prerelease": true,

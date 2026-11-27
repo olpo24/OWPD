@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.5.4-beta] - 2026-11-27
+
+- Improved: Refactor messages.json to clean up structure
+- Improved: Refactor messages.json by removing redundant object
+- Improved: Refactor state management for sites and settings
+- Improved: Update dashboard.js
+- Improved: Fix missing newline at end of background.js
+- Improved: Revise licenseFreeDesc for clarity on membership
+- Improved: Fix JSON formatting in messages.json
+- Improved: Update licenseFreeDesc message for clarity
+- Improved: Update version and improve site handling in sidepanel
+- Improved: Refactor dashboard.js for improved state management
+- Improved: Refactor dashboard.js for improved functionality
+- Improved: Update version and author information in sidepanel.html
+- Improved: Update dashboard.html with i18n attributes
+- Improved: Update background.js
+- Improved: Update license.js
+- Improved: Update dashboard.js
+- Improved: Add German localization for license settings
+- Improved: Update messages.json
+- Improved: Change dashboard URL to use 'views' directory
+- Improved: Fix import path for license.js in background.js
+- Improved: Update import path for license.js in background.js
+
 ## [0.5.3-beta] - 2026-11-27
 
 - Improved: Refactor sidepanel.js for theme and site management
