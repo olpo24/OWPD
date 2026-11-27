@@ -312,5 +312,88 @@
         "content": "$2"
       }
     }
+  },
+  {
+  "settingsLicenseTitle": {
+    "message": "License & Membership"
+  },
+  "licensePlaceholder": {
+    "message": "OWPD-XXXX-XXXX-XXXX-XXXX"
+  },
+  "licenseActivateBtn": {
+    "message": "Activate"
+  },
+  "licenseRefreshBtn": {
+    "message": "↻ Refresh"
+  },
+  "licenseRemoveBtn": {
+    "message": "Remove"
+  },
+  "licenseFreeTitle": {
+    "message": "Plan: OWPD Free (max. 3 sites)"
+  },
+  "licenseFreeDesc": {
+    "message": "Unlock Pro (6 sites, Magic Login & Bricks Actions) or Ultimate (Unlimited sites, JSON Sync & Notes) with a monthly Ko-fi Membership."
+  },
+  "licenseActivePrefix": {
+    "message": "● Active: OWPD"
+  },
+  "licenseLimitLabel": {
+    "message": "Site limit"
+  },
+  "licenseUnlimited": {
+    "message": "Unlimited"
+  },
+  "licenseSitesUnit": {
+    "message": "sites"
+  },
+  "licenseDevicesLabel": {
+    "message": "Devices"
+  },
+  "licenseActiveUntil": {
+    "message": "Active until"
+  },
+  "licenseMonthlySub": {
+    "message": "monthly Ko-fi Membership"
+  },
+  "licenseLifetime": {
+    "message": "Unlimited license"
+  },
+  "licenseUpgradePrompt": {
+    "message": "is available starting with OWPD $PLAN$. Activate your license under Settings.",
+    "placeholders": {
+      "plan": {
+        "content": "$1"
+      }
+    }
+  },
+  "licenseActivatedToast": {
+    "message": "OWPD $PLAN$ activated!",
+    "placeholders": {
+      "plan": {
+        "content": "$1"
+      }
+    }
+  },
+  "licenseRefreshedToast": {
+    "message": "License status successfully refreshed."
+  },
+  "licenseRemovedToast": {
+    "message": "License removed from this device (Free mode)."
+  },
+  "licenseLimitReachedToast": {
+    "message": "Limit reached ($USED$/$MAX$). Upgrade to OWPD $PLAN$ to add more sites.",
+    "placeholders": {
+      "used": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      },
+      "plan": {
+        "content": "$3"
+      }
+    }
   }
+}
 }
