@@ -3,17 +3,26 @@
  *
  * Project: Olpo's WordPressDock (OWPD)
  * Author:  Ole Poetter
- * Version: 0.5.4-beta
+ * Version: 0.5.10-beta
  */
 
 (() => {
   'use strict';
 
   const DEFAULT_PREFS = {
-    theme: 'system',
+    themeMode: 'system',
     accentColor: 'carbon-orange',
     notifyOffline: true,
     notifyUpdates: true,
+  };
+
+  const FALLBACK_ACCENTS = {
+    'carbon-orange': { labelKey: 'accentOrange', swatch: '#e8501f' },
+    'electric-cobalt': { labelKey: 'accentCobalt', swatch: '#2563eb' },
+    'emerald-mint': { labelKey: 'accentEmerald', swatch: '#059669' },
+    'amber-volt': { labelKey: 'accentAmber', swatch: '#d97706' },
+    'cyber-violet': { labelKey: 'accentViolet', swatch: '#7c3aed' },
+    'crimson-rose': { labelKey: 'accentCrimson', swatch: '#e11d48' },
   };
 
   let state = {
@@ -120,15 +129,15 @@
         renderStats();
         renderGrid();
       }
-      if (changes.theme || changes.accentColor) {
-        if (changes.theme) state.prefs.theme = changes.theme.newValue || 'system';
+      if (changes.themeMode || changes.accentColor) {
+        if (changes.themeMode) state.prefs.themeMode = changes.themeMode.newValue || 'system';
         if (changes.accentColor) state.prefs.accentColor = changes.accentColor.newValue || 'carbon-orange';
-        applyThemeAndAccent();
+        syncThemeControlsUI();
       }
     });
 
     await loadData();
-    applyThemeAndAccent();
+    syncThemeControlsUI();
     bindNavigation();
     bindTopbarAndModal();
     bindSettingsControls();
@@ -139,7 +148,6 @@
     renderStats();
     renderGrid();
 
-    // Direkt-Link über Hash (#site=...) aus Desktop-Benachrichtigungen öffnen
     if (window.location.hash.startsWith('#site=')) {
       const targetId = decodeURIComponent(window.location.hash.slice(6));
       const targetSite = state.sites.find((s) => s.id === targetId);
@@ -150,10 +158,10 @@
   });
 
   async function loadData() {
-    const data = await storageGet(['sites', 'theme', 'accentColor', 'notifyOffline', 'notifyUpdates']);
+    const data = await storageGet(['sites', 'themeMode', 'accentColor', 'notifyOffline', 'notifyUpdates']);
     state.sites = Array.isArray(data.sites) ? data.sites : [];
     state.prefs = {
-      theme: data.theme || DEFAULT_PREFS.theme,
+      themeMode: data.themeMode || DEFAULT_PREFS.themeMode,
       accentColor: data.accentColor || DEFAULT_PREFS.accentColor,
       notifyOffline: data.notifyOffline !== undefined ? Boolean(data.notifyOffline) : true,
       notifyUpdates: data.notifyUpdates !== undefined ? Boolean(data.notifyUpdates) : true,
@@ -161,23 +169,46 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Theme & Akzentfarben (für alle Tarife inkl. Free aktiv)
+  // Theme & Akzentfarben (kopplung an themes.js: OWPD_ACCENTS & applyThemeAndAccent)
   // ---------------------------------------------------------------------------
 
-  function applyThemeAndAccent() {
-    if (window.OWPDThemes && typeof window.OWPDThemes.apply === 'function') {
-      window.OWPDThemes.apply({
-        theme: state.prefs.theme,
-        accent: state.prefs.accentColor,
-      });
-    } else {
-      document.documentElement.dataset.theme = state.prefs.theme;
-      document.documentElement.dataset.accent = state.prefs.accentColor;
+  function renderAccentSwatches() {
+    const grid = document.getElementById('settings-accent-grid');
+    if (!grid) return;
+
+    const accentsMap = typeof OWPD_ACCENTS !== 'undefined' ? OWPD_ACCENTS : FALLBACK_ACCENTS;
+    const currentAccent = state.prefs.accentColor || 'carbon-orange';
+
+    grid.innerHTML = Object.entries(accentsMap)
+      .map(([key, cfg]) => {
+        const isActive = key === currentAccent;
+        const label = t(cfg.labelKey, key);
+        return `
+          <button
+            type="button"
+            class="owpd-swatch-btn ${isActive ? 'owpd-swatch-btn--active' : ''}"
+            data-accent="${key}"
+          >
+            <span class="owpd-swatch-btn__dot" style="background-color:${cfg.swatch};"></span>
+            <span>${escapeHtml(label)}</span>
+          </button>
+        `;
+      })
+      .join('');
+  }
+
+  function syncThemeControlsUI() {
+    if (typeof applyThemeAndAccent === 'function') {
+      applyThemeAndAccent(state.prefs.themeMode, state.prefs.accentColor);
     }
 
     document.querySelectorAll('#settings-theme-group [data-theme-choice]').forEach((btn) => {
-      btn.classList.toggle('is-active', btn.dataset.themeChoice === state.prefs.theme);
+      const active = btn.dataset.themeChoice === state.prefs.themeMode;
+      btn.classList.toggle('is-active', active);
+      btn.classList.toggle('owpd-segmented__btn--active', active);
     });
+
+    renderAccentSwatches();
   }
 
   // ---------------------------------------------------------------------------
@@ -320,6 +351,7 @@
       if (sitesView) sitesView.hidden = true;
       if (settingsView) settingsView.hidden = false;
       renderLicenseUI();
+      syncThemeControlsUI();
     } else {
       if (sitesView) sitesView.hidden = false;
       if (settingsView) settingsView.hidden = true;
@@ -338,10 +370,10 @@
     if (themeToggle) {
       themeToggle.addEventListener('click', async () => {
         const order = ['system', 'light', 'dark'];
-        const next = order[(order.indexOf(state.prefs.theme) + 1) % order.length];
-        state.prefs.theme = next;
-        await storageSet({ theme: next });
-        applyThemeAndAccent();
+        const next = order[(order.indexOf(state.prefs.themeMode) + 1) % order.length];
+        state.prefs.themeMode = next;
+        await storageSet({ themeMode: next });
+        syncThemeControlsUI();
       });
     }
   }
@@ -392,9 +424,15 @@
     const backdrop = document.getElementById('db-modal-backdrop');
     const closeBtn = document.getElementById('modal-close');
     if (closeBtn && backdrop) {
-      closeBtn.addEventListener('click', () => backdrop.classList.remove('is-open'));
+      closeBtn.addEventListener('click', () => {
+        backdrop.classList.remove('is-open');
+        backdrop.classList.remove('owpd-modal-backdrop--open');
+      });
       backdrop.addEventListener('click', (e) => {
-        if (e.target === backdrop) backdrop.classList.remove('is-open');
+        if (e.target === backdrop) {
+          backdrop.classList.remove('is-open');
+          backdrop.classList.remove('owpd-modal-backdrop--open');
+        }
       });
     }
 
@@ -442,7 +480,10 @@
         }
 
         await storageSet({ sites: state.sites });
-        if (backdrop) backdrop.classList.remove('is-open');
+        if (backdrop) {
+          backdrop.classList.remove('is-open');
+          backdrop.classList.remove('owpd-modal-backdrop--open');
+        }
         renderStats();
         renderGrid();
         showToast(t('save', 'Saved'), 'success');
@@ -456,7 +497,10 @@
         if (!id) return;
         state.sites = state.sites.filter((s) => s.id !== id);
         await storageSet({ sites: state.sites });
-        if (backdrop) backdrop.classList.remove('is-open');
+        if (backdrop) {
+          backdrop.classList.remove('is-open');
+          backdrop.classList.remove('owpd-modal-backdrop--open');
+        }
         renderStats();
         renderGrid();
         showToast(t('deleteSite', 'Delete installation'), 'info');
@@ -500,6 +544,7 @@
     if (checkBtn) checkBtn.hidden = !site;
 
     backdrop.classList.add('is-open');
+    backdrop.classList.add('owpd-modal-backdrop--open');
   }
 
   // ---------------------------------------------------------------------------
@@ -509,9 +554,9 @@
   function bindSettingsControls() {
     document.querySelectorAll('#settings-theme-group [data-theme-choice]').forEach((btn) => {
       btn.addEventListener('click', async () => {
-        state.prefs.theme = btn.dataset.themeChoice;
-        await storageSet({ theme: state.prefs.theme });
-        applyThemeAndAccent();
+        state.prefs.themeMode = btn.dataset.themeChoice;
+        await storageSet({ themeMode: state.prefs.themeMode });
+        syncThemeControlsUI();
       });
     });
 
@@ -523,7 +568,7 @@
 
         state.prefs.accentColor = swatch.dataset.accent;
         await storageSet({ accentColor: state.prefs.accentColor });
-        applyThemeAndAccent();
+        syncThemeControlsUI();
       });
     }
 
@@ -599,13 +644,13 @@
 
           await storageSet({
             sites: state.sites,
-            theme: state.prefs.theme,
+            themeMode: state.prefs.themeMode,
             accentColor: state.prefs.accentColor,
             notifyOffline: state.prefs.notifyOffline,
             notifyUpdates: state.prefs.notifyUpdates,
           });
 
-          applyThemeAndAccent();
+          syncThemeControlsUI();
           renderStats();
           renderGrid();
           showToast(
