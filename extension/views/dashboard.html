@@ -34,7 +34,7 @@
           <div>
             <div style="display: flex; align-items: center; gap: 0.6rem;">
               <div class="db-brand__title">OWPD</div>
-              <span id="db-plan-badge" class="owpd-badge" style="font-size: 1.1rem; padding: 0.1rem 0.6rem; border-radius: 999px; background: rgba(148, 163, 184, 0.2);">Free</span>
+              <span id="db-plan-badge" class="owpd-badge owpd-badge--neutral">Free</span>
             </div>
             <div class="db-brand__sub">WordPressDock</div>
           </div>
@@ -92,16 +92,17 @@
                 type="text"
                 id="setting-license-key"
                 class="owpd-input"
+                data-i18n-placeholder="licensePlaceholder"
                 placeholder="OWPD-XXXX-XXXX-XXXX-XXXX"
                 style="flex: 1; min-width: 24rem; font-family: monospace; text-transform: uppercase;"
               >
-              <button type="button" id="btn-activate-license" class="owpd-btn owpd-btn--primary">
+              <button type="button" id="btn-activate-license" class="owpd-btn owpd-btn--primary" data-i18n="licenseActivateBtn">
                 Activate
               </button>
-              <button type="button" id="btn-revalidate-license" class="owpd-btn" hidden>
+              <button type="button" id="btn-revalidate-license" class="owpd-btn" data-i18n="licenseRefreshBtn" hidden>
                 ↻ Refresh
               </button>
-              <button type="button" id="btn-deactivate-license" class="owpd-btn owpd-btn--danger" hidden>
+              <button type="button" id="btn-deactivate-license" class="owpd-btn owpd-btn--danger" data-i18n="licenseRemoveBtn" hidden>
                 Remove
               </button>
             </div>
