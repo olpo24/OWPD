@@ -5,7 +5,7 @@
  * Author: Ole Poetter
  * Author URI: https://olpo.de
  */
-importScripts('/js/license.js');
+importScripts('license.js');
 const BADGE_STYLE = 'dot';
 
 const ACCENT_BADGE_COLORS = {
