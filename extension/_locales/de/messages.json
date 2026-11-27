@@ -333,7 +333,7 @@
     "message": "Tarif: OWPD Free (max. 3 Instanzen)"
   },
   "licenseFreeDesc": {
-    "message": "Schalte mit einer monatlichen Ko-fi Membership Pro (6 Instanzen, Magic Login & Bricks-Actions) oder Ultimate (Unbegrenzt, JSON-Sync & Notizen) frei."
+    "message": "Erweitere OWPD mit einer monatlichen Ko-fi Membership auf Pro (6 Instanzen + kommende Pro-Features) oder Ultimate (Unbegrenzt + alle Pro-Features)."
   },
   "licenseActivePrefix": {
     "message": "● Aktiv: OWPD"
@@ -395,5 +395,4 @@
       }
     }
   }
-}
 }
