@@ -9,29 +9,19 @@
 (() => {
   'use strict';
 
-  const STORAGE_KEYS = {
-    SITES: 'sites',
-    SETTINGS: 'owpd_settings',
-  };
-
-  const DEFAULT_SETTINGS = {
+  const DEFAULT_PREFS = {
     theme: 'system',
-    accent: 'blue',
+    accentColor: 'carbon-orange',
     notifyOffline: true,
     notifyUpdates: true,
   };
 
   let state = {
     sites: [],
-    settings: { ...DEFAULT_SETTINGS },
+    prefs: { ...DEFAULT_PREFS },
     filter: 'all', // 'all' | 'updates' | 'offline' | 'settings'
     searchQuery: '',
-    editingSiteId: null,
   };
-
-  // ---------------------------------------------------------------------------
-  // Storage & i18n Helpers
-  // ---------------------------------------------------------------------------
 
   function storageGet(keys) {
     return new Promise((resolve) => {
@@ -66,10 +56,6 @@
   // Lizenz-Helper (Free = 3 Sites + voller Basisfunktionsumfang, Pro = 6, Ultimate = 9999)
   // ---------------------------------------------------------------------------
 
-  function hasPro() {
-    return window.OWPDLicense ? window.OWPDLicense.hasPro() : false;
-  }
-
   function canAddSite(count) {
     return window.OWPDLicense ? window.OWPDLicense.canAddSite(count) : count < 3;
   }
@@ -103,6 +89,15 @@
     setTimeout(() => toast.remove(), 4200);
   }
 
+  function getSiteUpdateCount(site) {
+    return (
+      (site.pluginsCount || 0) +
+      (site.themesCount || 0) +
+      (site.translationsCount || 0) +
+      (site.coreUpdate ? 1 : 0)
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // Initialisierung
   // ---------------------------------------------------------------------------
@@ -120,15 +115,14 @@
 
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== 'local') return;
-      if (changes[STORAGE_KEYS.SITES]) {
-        state.sites = Array.isArray(changes[STORAGE_KEYS.SITES].newValue)
-          ? changes[STORAGE_KEYS.SITES].newValue
-          : [];
+      if (changes.sites) {
+        state.sites = Array.isArray(changes.sites.newValue) ? changes.sites.newValue : [];
         renderStats();
         renderGrid();
       }
-      if (changes[STORAGE_KEYS.SETTINGS]) {
-        state.settings = { ...DEFAULT_SETTINGS, ...(changes[STORAGE_KEYS.SETTINGS].newValue || {}) };
+      if (changes.theme || changes.accentColor) {
+        if (changes.theme) state.prefs.theme = changes.theme.newValue || 'system';
+        if (changes.accentColor) state.prefs.accentColor = changes.accentColor.newValue || 'carbon-orange';
         applyThemeAndAccent();
       }
     });
@@ -144,39 +138,45 @@
     renderLicenseUI();
     renderStats();
     renderGrid();
+
+    // Direkt-Link über Hash (#site=...) aus Desktop-Benachrichtigungen öffnen
+    if (window.location.hash.startsWith('#site=')) {
+      const targetId = decodeURIComponent(window.location.hash.slice(6));
+      const targetSite = state.sites.find((s) => s.id === targetId);
+      if (targetSite) {
+        openSiteModal(targetSite);
+      }
+    }
   });
 
   async function loadData() {
-    const data = await storageGet([STORAGE_KEYS.SITES, 'owpd_sites', STORAGE_KEYS.SETTINGS]);
-    if (Array.isArray(data[STORAGE_KEYS.SITES])) {
-      state.sites = data[STORAGE_KEYS.SITES];
-    } else if (Array.isArray(data.owpd_sites)) {
-      state.sites = data.owpd_sites;
-    } else {
-      state.sites = [];
-    }
-    state.settings = { ...DEFAULT_SETTINGS, ...(data[STORAGE_KEYS.SETTINGS] || {}) };
+    const data = await storageGet(['sites', 'theme', 'accentColor', 'notifyOffline', 'notifyUpdates']);
+    state.sites = Array.isArray(data.sites) ? data.sites : [];
+    state.prefs = {
+      theme: data.theme || DEFAULT_PREFS.theme,
+      accentColor: data.accentColor || DEFAULT_PREFS.accentColor,
+      notifyOffline: data.notifyOffline !== undefined ? Boolean(data.notifyOffline) : true,
+      notifyUpdates: data.notifyUpdates !== undefined ? Boolean(data.notifyUpdates) : true,
+    };
   }
 
   // ---------------------------------------------------------------------------
-  // Theme & Akzentfarben (für alle Tarife inkl. Free frei verfügbar)
+  // Theme & Akzentfarben (für alle Tarife inkl. Free aktiv)
   // ---------------------------------------------------------------------------
 
   function applyThemeAndAccent() {
-    const effectiveAccent = state.settings.accent || 'blue';
-
     if (window.OWPDThemes && typeof window.OWPDThemes.apply === 'function') {
       window.OWPDThemes.apply({
-        theme: state.settings.theme || 'system',
-        accent: effectiveAccent,
+        theme: state.prefs.theme,
+        accent: state.prefs.accentColor,
       });
     } else {
-      document.documentElement.dataset.theme = state.settings.theme || 'system';
-      document.documentElement.dataset.accent = effectiveAccent;
+      document.documentElement.dataset.theme = state.prefs.theme;
+      document.documentElement.dataset.accent = state.prefs.accentColor;
     }
 
     document.querySelectorAll('#settings-theme-group [data-theme-choice]').forEach((btn) => {
-      btn.classList.toggle('is-active', btn.dataset.themeChoice === (state.settings.theme || 'system'));
+      btn.classList.toggle('is-active', btn.dataset.themeChoice === state.prefs.theme);
     });
   }
 
@@ -338,9 +338,9 @@
     if (themeToggle) {
       themeToggle.addEventListener('click', async () => {
         const order = ['system', 'light', 'dark'];
-        const next = order[(order.indexOf(state.settings.theme) + 1) % order.length];
-        state.settings.theme = next;
-        await storageSet({ [STORAGE_KEYS.SETTINGS]: state.settings });
+        const next = order[(order.indexOf(state.prefs.theme) + 1) % order.length];
+        state.prefs.theme = next;
+        await storageSet({ theme: next });
         applyThemeAndAccent();
       });
     }
@@ -383,7 +383,7 @@
     const checkAllBtn = document.getElementById('db-check-all');
     if (checkAllBtn) {
       checkAllBtn.addEventListener('click', () => {
-        chrome.runtime.sendMessage({ type: 'OWPD_CHECK_ALL_SITES' }, () => {
+        chrome.runtime.sendMessage({ type: 'CHECK_ALL_SITES' }, () => {
           showToast(t('checkingAll', 'Checking all...'), 'info');
         });
       });
@@ -441,7 +441,7 @@
           state.sites.push(siteData);
         }
 
-        await storageSet({ [STORAGE_KEYS.SITES]: state.sites });
+        await storageSet({ sites: state.sites });
         if (backdrop) backdrop.classList.remove('is-open');
         renderStats();
         renderGrid();
@@ -455,7 +455,7 @@
         const id = document.getElementById('field-id').value;
         if (!id) return;
         state.sites = state.sites.filter((s) => s.id !== id);
-        await storageSet({ [STORAGE_KEYS.SITES]: state.sites });
+        await storageSet({ sites: state.sites });
         if (backdrop) backdrop.classList.remove('is-open');
         renderStats();
         renderGrid();
@@ -468,7 +468,7 @@
       checkBtn.addEventListener('click', () => {
         const id = document.getElementById('field-id').value;
         if (!id) return;
-        chrome.runtime.sendMessage({ type: 'OWPD_CHECK_SITE', siteId: id }, () => {
+        chrome.runtime.sendMessage({ type: 'CHECK_SINGLE_SITE', siteId: id }, () => {
           showToast(t('testingStatus', 'Checking...'), 'info');
         });
       });
@@ -509,8 +509,8 @@
   function bindSettingsControls() {
     document.querySelectorAll('#settings-theme-group [data-theme-choice]').forEach((btn) => {
       btn.addEventListener('click', async () => {
-        state.settings.theme = btn.dataset.themeChoice;
-        await storageSet({ [STORAGE_KEYS.SETTINGS]: state.settings });
+        state.prefs.theme = btn.dataset.themeChoice;
+        await storageSet({ theme: state.prefs.theme });
         applyThemeAndAccent();
       });
     });
@@ -521,34 +521,34 @@
         const swatch = e.target.closest('[data-accent]');
         if (!swatch) return;
 
-        state.settings.accent = swatch.dataset.accent;
-        await storageSet({ [STORAGE_KEYS.SETTINGS]: state.settings });
+        state.prefs.accentColor = swatch.dataset.accent;
+        await storageSet({ accentColor: state.prefs.accentColor });
         applyThemeAndAccent();
       });
     }
 
     const notifyOffline = document.getElementById('setting-notify-offline');
     if (notifyOffline) {
-      notifyOffline.checked = Boolean(state.settings.notifyOffline);
+      notifyOffline.checked = Boolean(state.prefs.notifyOffline);
       notifyOffline.addEventListener('change', async (e) => {
-        state.settings.notifyOffline = e.target.checked;
-        await storageSet({ [STORAGE_KEYS.SETTINGS]: state.settings });
+        state.prefs.notifyOffline = e.target.checked;
+        await storageSet({ notifyOffline: state.prefs.notifyOffline });
       });
     }
 
     const notifyUpdates = document.getElementById('setting-notify-updates');
     if (notifyUpdates) {
-      notifyUpdates.checked = Boolean(state.settings.notifyUpdates);
+      notifyUpdates.checked = Boolean(state.prefs.notifyUpdates);
       notifyUpdates.addEventListener('change', async (e) => {
-        state.settings.notifyUpdates = e.target.checked;
-        await storageSet({ [STORAGE_KEYS.SETTINGS]: state.settings });
+        state.prefs.notifyUpdates = e.target.checked;
+        await storageSet({ notifyUpdates: state.prefs.notifyUpdates });
       });
     }
 
     const testNotifyBtn = document.getElementById('btn-test-notification');
     if (testNotifyBtn) {
       testNotifyBtn.addEventListener('click', () => {
-        chrome.runtime.sendMessage({ type: 'OWPD_TEST_NOTIFICATION' });
+        chrome.runtime.sendMessage({ type: 'SEND_TEST_NOTIFICATION' });
         showToast(t('testNotificationBtn', 'Send test notification'), 'info');
       });
     }
@@ -568,7 +568,7 @@
           version: '0.5.10-beta',
           exportedAt: new Date().toISOString(),
           sites: state.sites,
-          settings: state.settings,
+          prefs: state.prefs,
         };
 
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -593,11 +593,16 @@
           }
 
           state.sites = parsed.sites;
-          if (parsed.settings) state.settings = { ...DEFAULT_SETTINGS, ...parsed.settings };
+          if (parsed.prefs) {
+            state.prefs = { ...DEFAULT_PREFS, ...parsed.prefs };
+          }
 
           await storageSet({
-            [STORAGE_KEYS.SITES]: state.sites,
-            [STORAGE_KEYS.SETTINGS]: state.settings,
+            sites: state.sites,
+            theme: state.prefs.theme,
+            accentColor: state.prefs.accentColor,
+            notifyOffline: state.prefs.notifyOffline,
+            notifyUpdates: state.prefs.notifyUpdates,
           });
 
           applyThemeAndAccent();
@@ -630,8 +635,10 @@
     const total = state.sites.length;
     const maxSites = getMaxSites();
     const maxLabel = maxSites >= 9999 ? '∞' : maxSites;
-    const withUpdates = state.sites.filter((s) => (s.updatesCount || 0) > 0).length;
-    const offline = state.sites.filter((s) => s.status === 'offline' || s.status === 'error').length;
+    const withUpdates = state.sites.filter((s) => getSiteUpdateCount(s) > 0).length;
+    const offline = state.sites.filter(
+      (s) => s.status === 'offline' || s.status === 'error' || s.status === 'auth_error'
+    ).length;
 
     statsEl.innerHTML = `
       <div class="db-stat-card">
@@ -654,12 +661,17 @@
     if (!grid) return;
 
     const filtered = state.sites.filter((site) => {
-      if (state.filter === 'updates' && !(site.updatesCount > 0)) return false;
-      if (state.filter === 'offline' && site.status !== 'offline' && site.status !== 'error') {
+      if (state.filter === 'updates' && !(getSiteUpdateCount(site) > 0)) return false;
+      if (
+        state.filter === 'offline' &&
+        site.status !== 'offline' &&
+        site.status !== 'error' &&
+        site.status !== 'auth_error'
+      ) {
         return false;
       }
       if (state.searchQuery) {
-        const hay = `${site.name} ${site.url} ${site.category || ''}`.toLowerCase();
+        const hay = `${site.name} ${site.url} ${site.category || ''} ${site.notes || ''}`.toLowerCase();
         if (!hay.includes(state.searchQuery)) return false;
       }
       return true;
@@ -673,11 +685,14 @@
     grid.innerHTML = filtered
       .map((site) => {
         const statusDot =
-          site.status === 'offline' || site.status === 'error' ? '🔴' : '🟢';
+          site.status === 'offline' || site.status === 'error' || site.status === 'auth_error'
+            ? '🔴'
+            : '🟢';
         const hasAutoLogin = Boolean(site.username && site.appPassword);
+        const updatesTotal = getSiteUpdateCount(site);
         const updateBadge =
-          (site.updatesCount || 0) > 0
-            ? `<span class="owpd-badge owpd-badge--warn">${site.updatesCount === 1 ? escapeHtml(t('updateSingle', '1 Update')) : escapeHtml(t('updatePlural', '$1 Updates', [site.updatesCount]))}</span>`
+          updatesTotal > 0
+            ? `<span class="owpd-badge owpd-badge--warn">${updatesTotal === 1 ? escapeHtml(t('updateSingle', '1 Update')) : escapeHtml(t('updatePlural', '$1 Updates', [updatesTotal]))}</span>`
             : '';
         const bricksBtn = site.bricksActive
           ? `<a href="${escapeHtml(site.url)}?bricks=run" target="_blank" rel="noopener" class="owpd-btn owpd-btn--sm">${escapeHtml(t('bricksEditor', 'Bricks Editor'))}</a>`
@@ -707,7 +722,7 @@
       .join('');
 
     grid.querySelectorAll('[data-action]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', () => {
         const site = state.sites.find((s) => s.id === btn.dataset.id);
         if (!site) return;
 
