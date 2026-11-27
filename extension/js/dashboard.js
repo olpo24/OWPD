@@ -61,10 +61,6 @@
     return out;
   }
 
-  // ---------------------------------------------------------------------------
-  // Lizenz-Helper (Free = 3 Sites + voller Basisfunktionsumfang, Pro = 6, Ultimate = 9999)
-  // ---------------------------------------------------------------------------
-
   function canAddSite(count) {
     return window.OWPDLicense ? window.OWPDLicense.canAddSite(count) : count < 3;
   }
@@ -105,6 +101,19 @@
       (site.translationsCount || 0) +
       (site.coreUpdate ? 1 : 0)
     );
+  }
+
+  function renderStatusBadge(site) {
+    if (site.status === 'online') {
+      return `<span class="owpd-badge owpd-badge--online"><span class="owpd-dot"></span>${escapeHtml(t('statusOnline', 'Online'))}</span>`;
+    }
+    if (site.status === 'auth_error') {
+      return `<span class="owpd-badge owpd-badge--auth_error"><span class="owpd-dot"></span>${escapeHtml(t('statusAuthError', 'Auth Error'))}</span>`;
+    }
+    if (site.status === 'offline' || site.status === 'error') {
+      return `<span class="owpd-badge owpd-badge--offline"><span class="owpd-dot"></span>${escapeHtml(t('statusOffline', 'Offline'))}</span>`;
+    }
+    return `<span class="owpd-badge owpd-badge--neutral"><span class="owpd-dot"></span>${escapeHtml(t('statusUnchecked', 'Unchecked'))}</span>`;
   }
 
   // ---------------------------------------------------------------------------
@@ -169,7 +178,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Theme & Akzentfarben (kopplung an themes.js: OWPD_ACCENTS & applyThemeAndAccent)
+  // Theme & Akzentfarben (OWPD_ACCENTS & applyThemeAndAccent aus themes.js)
   // ---------------------------------------------------------------------------
 
   function renderAccentSwatches() {
@@ -212,7 +221,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Lizenz-UI im Settings-Bereich & Header
+  // Lizenz-UI
   // ---------------------------------------------------------------------------
 
   function renderLicenseUI() {
@@ -379,7 +388,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Topbar, Suche & Modal (#db-modal-backdrop / #site-form)
+  // Topbar, Suche & Modal
   // ---------------------------------------------------------------------------
 
   function bindTopbarAndModal() {
@@ -548,7 +557,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Settings Controls (Color Mode, Accent, Notifications – für alle Tarife aktiv)
+  // Settings Controls
   // ---------------------------------------------------------------------------
 
   function bindSettingsControls() {
@@ -600,7 +609,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Export / Import JSON (für alle Tarife inkl. Free aktiv)
+  // Export / Import JSON
   // ---------------------------------------------------------------------------
 
   function bindBackupControls() {
@@ -670,7 +679,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Rendering: Stats (#db-stats) & Grid (#db-grid)
+  // Rendering: Stats (#db-stats) & Carbon-Karten (#db-grid / .db-card)
   // ---------------------------------------------------------------------------
 
   function renderStats() {
@@ -680,10 +689,8 @@
     const total = state.sites.length;
     const maxSites = getMaxSites();
     const maxLabel = maxSites >= 9999 ? '∞' : maxSites;
+    const online = state.sites.filter((s) => s.status === 'online').length;
     const withUpdates = state.sites.filter((s) => getSiteUpdateCount(s) > 0).length;
-    const offline = state.sites.filter(
-      (s) => s.status === 'offline' || s.status === 'error' || s.status === 'auth_error'
-    ).length;
 
     statsEl.innerHTML = `
       <div class="db-stat-card">
@@ -691,12 +698,12 @@
         <div class="db-stat-card__value">${total} / ${maxLabel}</div>
       </div>
       <div class="db-stat-card">
-        <div class="db-stat-card__label">${escapeHtml(t('statUpdates', 'Pending Updates'))}</div>
-        <div class="db-stat-card__value">${withUpdates}</div>
+        <div class="db-stat-card__label">${escapeHtml(t('statOnline', 'Online & Reachable'))}</div>
+        <div class="db-stat-card__value">${online}</div>
       </div>
       <div class="db-stat-card">
-        <div class="db-stat-card__label">${escapeHtml(t('navOffline', 'Offline / Errors'))}</div>
-        <div class="db-stat-card__value">${offline}</div>
+        <div class="db-stat-card__label">${escapeHtml(t('statUpdates', 'Pending Updates'))}</div>
+        <div class="db-stat-card__value">${withUpdates}</div>
       </div>
     `;
   }
@@ -723,43 +730,81 @@
     });
 
     if (filtered.length === 0) {
-      grid.innerHTML = `<div style="grid-column:1/-1;opacity:0.7;padding:2rem 0;">${escapeHtml(t('noMatchingSites', 'No matching installations found.'))}</div>`;
+      grid.innerHTML = `<div class="owpd-empty" style="grid-column:1/-1;">${escapeHtml(t('noMatchingSites', 'No matching installations found.'))}</div>`;
       return;
     }
 
     grid.innerHTML = filtered
       .map((site) => {
-        const statusDot =
-          site.status === 'offline' || site.status === 'error' || site.status === 'auth_error'
-            ? '🔴'
-            : '🟢';
+        const cleanUrl = site.url.replace(/\/$/, '');
         const hasAutoLogin = Boolean(site.username && site.appPassword);
         const updatesTotal = getSiteUpdateCount(site);
+
         const updateBadge =
           updatesTotal > 0
-            ? `<span class="owpd-badge owpd-badge--warn">${updatesTotal === 1 ? escapeHtml(t('updateSingle', '1 Update')) : escapeHtml(t('updatePlural', '$1 Updates', [updatesTotal]))}</span>`
+            ? `<span class="owpd-badge owpd-badge--updates">${
+                updatesTotal === 1
+                  ? escapeHtml(t('updateSingle', '1 Update'))
+                  : escapeHtml(t('updatePlural', '$1 Updates', [updatesTotal]))
+              }</span>`
+            : site.companionActive
+            ? `<span class="owpd-badge owpd-badge--neutral">${escapeHtml(t('upToDate', 'Up to date'))}</span>`
             : '';
+
+        const wpBadge = site.wpVersion
+          ? `<span class="owpd-badge owpd-badge--neutral">WP ${escapeHtml(site.wpVersion)}</span>`
+          : '';
+
+        const phpBadge = site.phpVersion
+          ? `<span class="owpd-badge owpd-badge--neutral">PHP ${escapeHtml(site.phpVersion)}</span>`
+          : '';
+
+        const bricksBadge = site.bricksActive
+          ? `<span class="owpd-badge owpd-badge--neutral">Bricks ${escapeHtml(site.bricksVersion || '')}</span>`
+          : '';
+
         const bricksBtn = site.bricksActive
-          ? `<a href="${escapeHtml(site.url)}?bricks=run" target="_blank" rel="noopener" class="owpd-btn owpd-btn--sm">${escapeHtml(t('bricksEditor', 'Bricks Editor'))}</a>`
+          ? `<a href="${cleanUrl}/?bricks=run" target="_blank" rel="noopener" class="owpd-btn owpd-btn--sm">${escapeHtml(t('bricksEditor', 'Bricks Editor'))}</a>`
+          : '';
+
+        const notesPreview = site.notes
+          ? `<div style="font-size:1.2rem;color:var(--text-muted);line-height:1.45;">${escapeHtml(site.notes)}</div>`
           : '';
 
         return `
           <article class="db-card" data-id="${site.id}">
-            <div class="db-card__header">
-              <div>
-                <h3 class="db-card__title">${statusDot} ${escapeHtml(site.name)} ${updateBadge}</h3>
-                <a href="${escapeHtml(site.url)}" target="_blank" rel="noopener" class="db-card__url">${escapeHtml(site.url)}</a>
+            <div>
+              <div class="db-card__header">
+                <div>
+                  ${site.category ? `<div class="db-card__category">${escapeHtml(site.category)}</div>` : ''}
+                  <h3 class="db-card__title">${escapeHtml(site.name)}</h3>
+                  <a href="${cleanUrl}/" target="_blank" rel="noopener" class="sp-card__url">
+                    ${escapeHtml(cleanUrl.replace(/^https?:\/\//, ''))}
+                  </a>
+                </div>
+                ${renderStatusBadge(site)}
               </div>
-              <button type="button" class="owpd-btn owpd-btn--sm" data-action="edit" data-id="${site.id}">✎</button>
+
+              <div class="db-card__specs" style="margin-top:1.1rem;">
+                ${updateBadge}
+                ${wpBadge}
+                ${phpBadge}
+                ${bricksBadge}
+              </div>
+              ${notesPreview ? `<div style="margin-top:1rem;">${notesPreview}</div>` : ''}
             </div>
-            <div class="db-card__actions" style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-top:1.2rem;">
-              <a href="${escapeHtml(site.url)}/wp-admin/" target="_blank" rel="noopener" class="owpd-btn owpd-btn--sm">${escapeHtml(t('adminShort', 'Admin'))}</a>
+
+            <div class="db-card__footer">
               ${
                 hasAutoLogin
-                  ? `<button type="button" class="owpd-btn owpd-btn--sm owpd-btn--success" data-action="autologin" data-id="${site.id}">${escapeHtml(t('oneClickLogin', '1-Click Login'))}</button>`
-                  : ''
+                  ? `<button type="button" class="owpd-btn owpd-btn--sm owpd-btn--primary" data-action="autologin" data-id="${site.id}">${escapeHtml(t('oneClickLogin', '1-Click Login'))}</button>`
+                  : `<a href="${cleanUrl}/wp-admin/" target="_blank" rel="noopener" class="owpd-btn owpd-btn--sm owpd-btn--primary">${escapeHtml(t('adminShort', 'Admin'))}</a>`
               }
+              <a href="${cleanUrl}/wp-admin/plugins.php" target="_blank" rel="noopener" class="owpd-btn owpd-btn--sm">${escapeHtml(t('plugins', 'Plugins'))}</a>
               ${bricksBtn}
+              <button type="button" class="owpd-btn owpd-btn--sm" data-action="edit" data-id="${site.id}" style="margin-left:auto;">
+                ${escapeHtml(t('detailsAndUpdates', 'Details & Updates'))}
+              </button>
             </div>
           </article>
         `;
