@@ -1,9 +1,17 @@
 name: Release, Changelog & Store Deploy
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versionsnummer ohne "v" (z. B. 0.5.10-beta oder 1.0.0)'
+        required: true
+        type: string
+      publish_chrome:
+        description: 'Auch im Chrome Web Store veröffentlichen?'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -20,22 +28,30 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate version input
+        run: |
+          if [[ ! "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]; then
+            echo "Fehler: Ungültige Versionsnummer '${{ inputs.version }}'. Erwartet wird z. B. 0.5.10-beta oder 1.0.0"
+            exit 1
+          fi
+
       - name: Extract versions & generate Changelog
         id: meta
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
           python3 -c '
           import os, re, json, subprocess, pathlib
           from datetime import date
 
-          tag = os.environ["GITHUB_REF_NAME"]
-          full_ver = tag.lstrip("v")
+          full_ver = os.environ["INPUT_VERSION"].lstrip("v")
+          tag = f"v{full_ver}"
           base_part = full_ver.split("-")[0]
           parts = (base_part.split(".") + ["0", "0", "0"])[:3]
           major, minor, patch = int(parts[0]), int(parts[1]), int(parts[2])
 
-          # Solange Release <= 1.1.0 ist, für Store-APIs über 1.1.0 bleiben (version_name bleibt 0.x-beta)
+          # Solange Release <= 1.1.0 ist, für Store-API über 1.1.0 bleiben (version_name bleibt z. B. 0.5.10-beta)
           if (major, minor, patch) <= (1, 1, 0):
               manifest_ver = f"1.1.{max(1, patch)}"
           else:
@@ -45,11 +61,11 @@ jobs:
           is_prerelease = "-" in full_ver
 
           prev_tag_proc = subprocess.run(
-              ["git", "describe", "--tags", "--abbrev=0", f"{tag}^"],
+              ["git", "describe", "--tags", "--abbrev=0"],
               capture_output=True, text=True
           )
           prev_tag = prev_tag_proc.stdout.strip() if prev_tag_proc.returncode == 0 else ""
-          log_range = f"{prev_tag}..{tag}" if prev_tag else tag
+          log_range = f"{prev_tag}..HEAD" if prev_tag else "HEAD"
 
           commits_proc = subprocess.run(
               ["git", "log", log_range, "--pretty=format:%s"],
@@ -73,6 +89,7 @@ jobs:
           if not (added or improved or fixed):
               improved.append(f"Release {full_ver}")
 
+          # 1. changelog.json aktualisieren
           json_path = pathlib.Path("changelog.json")
           entries = json.loads(json_path.read_text(encoding="utf-8")) if json_path.exists() else []
           entries = [e for e in entries if e.get("version") != full_ver]
@@ -88,6 +105,7 @@ jobs:
           })
           json_path.write_text(json.dumps(entries, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
+          # 2. CHANGELOG.md aktualisieren
           md_lines = [f"## [{full_ver}] - {today}", ""]
           for item in added:
               md_lines.append(f"- Added: {item}")
@@ -104,6 +122,7 @@ jobs:
           header, rest = old_md.split("\n\n", 1) if "\n\n" in old_md else ("# Changelog", "")
           md_path.write_text(f"{header}\n\n{release_notes}\n\n{rest}".strip() + "\n", encoding="utf-8")
 
+          # 3. Versionen in PHP, JS, CSS, HTML, messages.json & manifest.json aktualisieren
           for ext in ("*.php", "*.js", "*.css", "*.html"):
               for path in pathlib.Path(".").rglob(ext):
                   content = path.read_text(encoding="utf-8")
@@ -132,19 +151,22 @@ jobs:
 
           pathlib.Path("/tmp/release_notes.md").write_text(release_notes, encoding="utf-8")
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"tag={tag}\n")
               f.write(f"full_version={full_ver}\n")
               f.write(f"manifest_version={manifest_ver}\n")
           '
 
-      - name: Commit bumped versions & changelogs back to main
+      - name: Commit bumped versions, changelogs & push Tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if [[ -n $(git status -s) ]]; then
             git add .
             git commit -m "chore(release): bump version & changelog to ${{ steps.meta.outputs.full_version }}"
-            git push origin HEAD:main || true
           fi
+          git tag -f "${{ steps.meta.outputs.tag }}"
+          git push origin HEAD:main
+          git push origin "${{ steps.meta.outputs.tag }}" --force
 
       - name: Package Extension & Companion ZIPs
         run: |
@@ -155,13 +177,14 @@ jobs:
       - name: Create GitHub Release with Changelog & ZIPs
         uses: softprops/action-gh-release@v3
         with:
+          tag_name: ${{ steps.meta.outputs.tag }}
           name: "OWPD ${{ steps.meta.outputs.full_version }}"
           body_path: /tmp/release_notes.md
           prerelease: ${{ contains(steps.meta.outputs.full_version, '-') }}
           files: dist/*.zip
 
       - name: Publish to Chrome Web Store
-        if: env.CHROME_CLIENT_ID != ''
+        if: ${{ inputs.publish_chrome && env.CHROME_CLIENT_ID != '' }}
         uses: Haberkamp/chrome-webstore-publish@v1
         with:
           zip-path: "dist/owpd-extension-${{ steps.meta.outputs.full_version }}.zip"
