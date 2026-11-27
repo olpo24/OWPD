@@ -12,7 +12,6 @@ jobs:
   release:
     runs-on: ubuntu-latest
     env:
-      EDGE_CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
       CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
 
     steps:
@@ -160,17 +159,6 @@ jobs:
           body_path: /tmp/release_notes.md
           prerelease: ${{ contains(steps.meta.outputs.full_version, '-') }}
           files: dist/*.zip
-
-      - name: Publish to Microsoft Edge Add-ons Store
-        if: env.EDGE_CLIENT_ID != ''
-        uses: wdzeng/edge-addon@v2
-        with:
-          product-id: ${{ secrets.EDGE_PRODUCT_ID }}
-          client-id: ${{ secrets.EDGE_CLIENT_ID }}
-          api-key: ${{ secrets.EDGE_API_KEY }}
-          zip-path: "dist/owpd-extension-${{ steps.meta.outputs.full_version }}.zip"
-          upload-only: false
-          notes-for-certification: "OWPD ${{ steps.meta.outputs.full_version }} - see CHANGELOG.md"
 
       - name: Publish to Chrome Web Store
         if: env.CHROME_CLIENT_ID != ''
