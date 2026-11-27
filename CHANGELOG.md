@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.3-beta] - 2026-11-27
+
+- Improved: Refactor sidepanel.js for theme and site management
+- Improved: Update fmt.Println message from 'Hello' to 'Goodbye'
+- Improved: Update dashboard.html with new version and license section
+- Improved: Remove comments from license.js for clarity
+- Improved: Refactor sidepanel.js for improved structure and features
+- Improved: Update dashboard.js
+- Improved: Import license.js in background.js
+- Improved: Add license.js script to sidepanel.html
+- Improved: Add license.js script to dashboard.html
+- Improved: Add specific host permission for owpd.olpo.de
+- Improved: Add OWPD License & Feature Gate Manager
+
 ## [0.5.2-beta] - 2026-11-27
 
 - Improved: Update Chrome Web Store publish step to API v2

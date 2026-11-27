@@ -1,5 +1,27 @@
 [
   {
+    "version": "0.5.3-beta",
+    "date": "2026-11-27",
+    "prerelease": true,
+    "changes": {
+      "added": [],
+      "improved": [
+        "Refactor sidepanel.js for theme and site management",
+        "Update fmt.Println message from 'Hello' to 'Goodbye'",
+        "Update dashboard.html with new version and license section",
+        "Remove comments from license.js for clarity",
+        "Refactor sidepanel.js for improved structure and features",
+        "Update dashboard.js",
+        "Import license.js in background.js",
+        "Add license.js script to sidepanel.html",
+        "Add license.js script to dashboard.html",
+        "Add specific host permission for owpd.olpo.de",
+        "Add OWPD License & Feature Gate Manager"
+      ],
+      "fixed": []
+    }
+  },
+  {
     "version": "0.5.2-beta",
     "date": "2026-11-27",
     "prerelease": true,
