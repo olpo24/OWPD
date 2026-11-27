@@ -312,5 +312,88 @@
         "content": "$2"
       }
     }
+  },
+  {
+  "settingsLicenseTitle": {
+    "message": "Lizenz & Membership"
+  },
+  "licensePlaceholder": {
+    "message": "OWPD-XXXX-XXXX-XXXX-XXXX"
+  },
+  "licenseActivateBtn": {
+    "message": "Aktivieren"
+  },
+  "licenseRefreshBtn": {
+    "message": "↻ Aktualisieren"
+  },
+  "licenseRemoveBtn": {
+    "message": "Entfernen"
+  },
+  "licenseFreeTitle": {
+    "message": "Tarif: OWPD Free (max. 3 Instanzen)"
+  },
+  "licenseFreeDesc": {
+    "message": "Schalte mit einer monatlichen Ko-fi Membership Pro (6 Instanzen, Magic Login & Bricks-Actions) oder Ultimate (Unbegrenzt, JSON-Sync & Notizen) frei."
+  },
+  "licenseActivePrefix": {
+    "message": "● Aktiv: OWPD"
+  },
+  "licenseLimitLabel": {
+    "message": "Instanz-Limit"
+  },
+  "licenseUnlimited": {
+    "message": "Unbegrenzt"
+  },
+  "licenseSitesUnit": {
+    "message": "Instanzen"
+  },
+  "licenseDevicesLabel": {
+    "message": "Geräte"
+  },
+  "licenseActiveUntil": {
+    "message": "Aktiv bis"
+  },
+  "licenseMonthlySub": {
+    "message": "monatliche Ko-fi Membership"
+  },
+  "licenseLifetime": {
+    "message": "Unbegrenzte Lizenz"
+  },
+  "licenseUpgradePrompt": {
+    "message": "ist ab OWPD $PLAN$ verfügbar. Aktiviere deine Lizenz unter Einstellungen.",
+    "placeholders": {
+      "plan": {
+        "content": "$1"
+      }
+    }
+  },
+  "licenseActivatedToast": {
+    "message": "OWPD $PLAN$ erfolgreich aktiviert!",
+    "placeholders": {
+      "plan": {
+        "content": "$1"
+      }
+    }
+  },
+  "licenseRefreshedToast": {
+    "message": "Lizenzstatus erfolgreich aktualisiert."
+  },
+  "licenseRemovedToast": {
+    "message": "Lizenz auf diesem Gerät entfernt (Free-Modus)."
+  },
+  "licenseLimitReachedToast": {
+    "message": "Limit erreicht ($USED$/$MAX$). Upgrade auf OWPD $PLAN$ für weitere Websites.",
+    "placeholders": {
+      "used": {
+        "content": "$1"
+      },
+      "max": {
+        "content": "$2"
+      },
+      "plan": {
+        "content": "$3"
+      }
+    }
   }
+}
 }
