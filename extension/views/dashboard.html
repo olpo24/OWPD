@@ -1,9 +1,9 @@
 <!--
- * OWPD - Olpo's WordPressDock
- * Description: Lightweight multi-site dashboard and companion for WordPress.
- * Version: 0.5.2-beta
- * Author: Ole Poetter
- * Author URI: https://olpo.de
+- OWPD - Olpo's WordPressDock
+- Description: Lightweight multi-site dashboard and companion for WordPress.
+- Version: 0.5.10-beta
+- Author: Ole Poetter
+- Author URI: https://olpo.de
 -->
 
 <!DOCTYPE html>
@@ -32,7 +32,10 @@
             <circle cx="24" cy="8" r="2.6" class="owpd-logo__dot"/>
           </svg>
           <div>
-            <div class="db-brand__title">OWPD</div>
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+              <div class="db-brand__title">OWPD</div>
+              <span id="db-plan-badge" class="owpd-badge" style="font-size: 1.1rem; padding: 0.1rem 0.6rem; border-radius: 999px; background: rgba(148, 163, 184, 0.2);">Free</span>
+            </div>
             <div class="db-brand__sub">WordPressDock</div>
           </div>
         </div>
@@ -79,6 +82,31 @@
         </div>
 
         <div class="owpd-settings-panel">
+          <!-- LICENSE & MEMBERSHIP SECTION -->
+          <div class="owpd-settings-section">
+            <h2 class="owpd-settings-section__title" data-i18n="settingsLicenseTitle">License &amp; Membership</h2>
+            <div id="settings-license-status" style="margin-bottom: 1rem;"></div>
+
+            <div style="display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: center;">
+              <input
+                type="text"
+                id="setting-license-key"
+                class="owpd-input"
+                placeholder="OWPD-XXXX-XXXX-XXXX-XXXX"
+                style="flex: 1; min-width: 24rem; font-family: monospace; text-transform: uppercase;"
+              >
+              <button type="button" id="btn-activate-license" class="owpd-btn owpd-btn--primary">
+                Activate
+              </button>
+              <button type="button" id="btn-revalidate-license" class="owpd-btn" hidden>
+                ↻ Refresh
+              </button>
+              <button type="button" id="btn-deactivate-license" class="owpd-btn owpd-btn--danger" hidden>
+                Remove
+              </button>
+            </div>
+          </div>
+
           <div class="owpd-settings-section">
             <h2 class="owpd-settings-section__title" data-i18n="settingsThemeMode">Color Mode</h2>
             <div class="owpd-segmented" id="settings-theme-group">
