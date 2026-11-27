@@ -1,11 +1,13 @@
 /**
- * OWPD - Olpo's WordPressDock
- * Description: Lightweight multi-site dashboard and companion for WordPress.
- * Version: 0.5.3-beta
- * Author: Ole Poetter
- * Author URI: https://olpo.de
+ * OWPD Background Service Worker
+ *
+ * Project: Olpo's WordPressDock (OWPD)
+ * Author:  Ole Poetter
+ * Version: 0.5.10-beta
  */
-importScripts('license.js');
+
+importScripts('/js/license.js');
+
 const BADGE_STYLE = 'dot';
 
 const ACCENT_BADGE_COLORS = {
@@ -14,7 +16,7 @@ const ACCENT_BADGE_COLORS = {
   'emerald-mint': '#059669',
   'amber-volt': '#d97706',
   'cyber-violet': '#7c3aed',
-  'crimson-rose': '#e11d48'
+  'crimson-rose': '#e11d48',
 };
 
 const notificationSiteMap = new Map();
@@ -27,26 +29,40 @@ chrome.sidePanel
   .setPanelBehavior({ openPanelOnActionClick: true })
   .catch((err) => console.error('OWPD SidePanel Error:', err));
 
-async function ensureAlarm() {
-  const existing = await chrome.alarms.get('owpdAutoCheck');
-  if (!existing) {
+async function ensureAlarms() {
+  const autoCheck = await chrome.alarms.get('owpdAutoCheck');
+  if (!autoCheck) {
     chrome.alarms.create('owpdAutoCheck', { periodInMinutes: 60 });
+  }
+
+  const licenseCheck = await chrome.alarms.get('owpdLicenseRevalidate');
+  if (!licenseCheck) {
+    chrome.alarms.create('owpdLicenseRevalidate', { periodInMinutes: 720 }); // Alle 12 Stunden
   }
 }
 
+async function initBackground() {
+  await ensureAlarms();
+  if (self.OWPDLicense) {
+    await self.OWPDLicense.init();
+  }
+  await checkAllStoredSites();
+}
+
 chrome.runtime.onInstalled.addListener(() => {
-  ensureAlarm();
-  checkAllStoredSites();
+  initBackground();
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  ensureAlarm();
-  checkAllStoredSites();
+  initBackground();
 });
 
-chrome.alarms.onAlarm.addListener((alarm) => {
+chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === 'owpdAutoCheck') {
-    checkAllStoredSites();
+    await checkAllStoredSites();
+  }
+  if (alarm.name === 'owpdLicenseRevalidate' && self.OWPDLicense) {
+    await self.OWPDLicense.init({ autoRevalidate: true });
   }
 });
 
@@ -99,13 +115,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       iconUrl: chrome.runtime.getURL('icons/icon128.png'),
       title: msg('notifTestTitle'),
       message: msg('notifTestBody'),
-      priority: 1
+      priority: 1,
     });
     sendResponse({ ok: true });
     return true;
   }
 });
 
+/**
+ * 1-Click Admin Login (in Free, Pro und Ultimate verfügbar).
+ */
 async function executeOneClickLogin(siteId) {
   const { sites = [] } = await chrome.storage.local.get('sites');
   const site = sites.find((s) => s.id === siteId);
@@ -121,8 +140,8 @@ async function executeOneClickLogin(siteId) {
     headers: {
       Authorization: `Basic ${token}`,
       'X-OWPD-Authorization': `Basic ${token}`,
-      Accept: 'application/json'
-    }
+      Accept: 'application/json',
+    },
   });
 
   if (!res.ok) {
@@ -177,7 +196,7 @@ async function evaluateSiteNotifications(previousSite, updatedSite, prefs) {
       iconUrl: chrome.runtime.getURL('icons/icon128.png'),
       title: msg('notifOfflineTitle', [updatedSite.name]),
       message: msg('notifOfflineBody', [updatedSite.url]),
-      priority: 2
+      priority: 2,
     });
   }
 
@@ -198,7 +217,7 @@ async function evaluateSiteNotifications(previousSite, updatedSite, prefs) {
       iconUrl: chrome.runtime.getURL('icons/icon128.png'),
       title: msg('notifUpdatesTitle', [updatedSite.name]),
       message: bodyText,
-      priority: 1
+      priority: 1,
     });
   }
 }
@@ -226,7 +245,7 @@ async function fetchSiteStatus(site) {
         ...site,
         status: response.status === 401 || response.status === 403 ? 'auth_error' : 'error',
         httpCode: response.status,
-        lastChecked: Date.now()
+        lastChecked: Date.now(),
       };
     }
 
@@ -250,7 +269,7 @@ async function fetchSiteStatus(site) {
         translationsUpdates: Array.isArray(data.translations_updates) ? data.translations_updates : [],
         bricksActive: Boolean(data.bricks_active),
         bricksVersion: data.bricks_version || '',
-        lastChecked: Date.now()
+        lastChecked: Date.now(),
       };
     }
 
@@ -259,14 +278,14 @@ async function fetchSiteStatus(site) {
       status: 'online',
       httpCode: 200,
       companionActive: false,
-      lastChecked: Date.now()
+      lastChecked: Date.now(),
     };
   } catch (err) {
     return {
       ...site,
       status: 'offline',
       httpCode: 0,
-      lastChecked: Date.now()
+      lastChecked: Date.now(),
     };
   }
 }
@@ -276,7 +295,7 @@ async function checkSingleSiteById(siteId) {
     sites = [],
     accentColor,
     notifyOffline = true,
-    notifyUpdates = true
+    notifyUpdates = true,
   } = await chrome.storage.local.get(['sites', 'accentColor', 'notifyOffline', 'notifyUpdates']);
 
   const idx = sites.findIndex((s) => s.id === siteId);
@@ -297,7 +316,7 @@ async function checkAllStoredSites() {
     sites = [],
     accentColor,
     notifyOffline = true,
-    notifyUpdates = true
+    notifyUpdates = true,
   } = await chrome.storage.local.get(['sites', 'accentColor', 'notifyOffline', 'notifyUpdates']);
 
   const updated = [];
@@ -334,7 +353,7 @@ async function updateExtensionBadge(sites, accentColor = 'carbon-orange') {
   if (totalUpdates > 0) {
     const badgeColor = ACCENT_BADGE_COLORS[accentColor] || ACCENT_BADGE_COLORS['carbon-orange'];
     await chrome.action.setBadgeText({
-      text: BADGE_STYLE === 'dot' ? '•' : String(totalUpdates)
+      text: BADGE_STYLE === 'dot' ? '•' : String(totalUpdates),
     });
     await chrome.action.setBadgeBackgroundColor({ color: badgeColor });
     await chrome.action.setBadgeTextColor({ color: '#ffffff' });
