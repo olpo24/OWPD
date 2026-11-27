@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2-beta] - 2026-11-27
+
+- Improved: Update Chrome Web Store publish step to API v2
+- Improved: Update release.yml
+- Improved: Remove Edge Add-ons Store publishing step
+- Improved: Update release workflow for Edge and Chrome stores
+
 ## [0.5.1-beta] - 2026-11-25
 
 - Added: environment variables for client IDs in release.yml

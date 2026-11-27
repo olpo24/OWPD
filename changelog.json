@@ -1,5 +1,20 @@
 [
   {
+    "version": "0.5.2-beta",
+    "date": "2026-11-27",
+    "prerelease": true,
+    "changes": {
+      "added": [],
+      "improved": [
+        "Update Chrome Web Store publish step to API v2",
+        "Update release.yml",
+        "Remove Edge Add-ons Store publishing step",
+        "Update release workflow for Edge and Chrome stores"
+      ],
+      "fixed": []
+    }
+  },
+  {
     "version": "0.5.1-beta",
     "date": "2026-11-25",
     "prerelease": true,
