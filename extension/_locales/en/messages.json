@@ -333,7 +333,7 @@
     "message": "Plan: OWPD Free (max. 3 sites)"
   },
   "licenseFreeDesc": {
-    "message": "Unlock Pro (6 sites, Magic Login & Bricks Actions) or Ultimate (Unlimited sites, JSON Sync & Notes) with a monthly Ko-fi Membership."
+    "message": "Upgrade with a monthly Ko-fi Membership to Pro (6 sites + upcoming Pro features) or Ultimate (Unlimited sites + all Pro features)."
   },
   "licenseActivePrefix": {
     "message": "● Active: OWPD"
@@ -394,6 +394,8 @@
         "content": "$3"
       }
     }
+  }
+}
   }
 }
 }
